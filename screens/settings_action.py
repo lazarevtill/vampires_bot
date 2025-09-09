@@ -301,6 +301,7 @@ class SettingsActionScreen(BaseScreen):
                         "resources_editable": True,
                     },
                     "text": action_obj.text,
+                    "ideology_shift": action_obj.ideology_shift,
                 }
             else:
                 # Если вообще нечего показать — минимальный контекст + back
@@ -352,12 +353,14 @@ class SettingsActionScreen(BaseScreen):
             action_ctx["ui"]["resources_editable"] = True
 
             is_help = (action_ctx.get("type") or "").lower() == "support"
+            is_attack = kind == "attack"
             keyboard = action_setup_kb(
                 resources_for_kb,
                 action_ctx["id"],
                 action_ctx["status"],
                 is_help=is_help,
                 is_list=is_list,
+                is_attack=is_attack,
             )
 
         elif kind == "scout":

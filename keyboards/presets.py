@@ -55,6 +55,7 @@ def action_setup_kb(
     communicate: bool = False,
     is_help: bool = False,
     is_list: bool = False,           # <--- НОВОЕ
+    is_attack: bool = False,         # <--- НОВОЕ: для атак показываем кнопки идеологии
 ) -> KeyboardSpec:
     """
     Строит inline-клавиатуру для настройки действия.
@@ -71,6 +72,9 @@ def action_setup_kb(
                 res = res.strip()
                 if res:
                     rows.append([f"{res}_remove", res, f"{res}_add"])
+            # Для атак добавляем кнопки выбора направления идеологии
+            if is_attack and "influence" in resources:
+                rows.append(["ideology_left", "ideology_none", "ideology_right"])
             rows.append(["moving_on_point"])
             rows.append(["done"])
             rows.append(["delete", "back"])

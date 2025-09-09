@@ -553,3 +553,84 @@ async def action_setup_menu_moving_on_point(cb: types.CallbackQuery, state: FSMC
     except Exception:
         logging.exception("action_setup_menu_moving_on_point failed")
         await cb.answer("Ошибка при изменении флага.", show_alert=True)
+
+
+@option("action_setup_menu_ideology_left")
+async def action_setup_menu_ideology_left(cb: types.CallbackQuery, state: FSMContext, action_id: int, **_):
+    """
+    Устанавливает ideology_shift = -1 (сдвиг влево) для Action(id=action_id).
+    """
+    await _set_ideology_shift(cb, state, action_id, -1)
+
+
+@option("action_setup_menu_ideology_none")
+async def action_setup_menu_ideology_none(cb: types.CallbackQuery, state: FSMContext, action_id: int, **_):
+    """
+    Устанавливает ideology_shift = 0 (не изменять) для Action(id=action_id).
+    """
+    await _set_ideology_shift(cb, state, action_id, 0)
+
+
+@option("action_setup_menu_ideology_right")
+async def action_setup_menu_ideology_right(cb: types.CallbackQuery, state: FSMContext, action_id: int, **_):
+    """
+    Устанавливает ideology_shift = 1 (сдвиг вправо) для Action(id=action_id).
+    """
+    await _set_ideology_shift(cb, state, action_id, 1)
+
+
+async def _set_ideology_shift(cb: types.CallbackQuery, state: FSMContext, action_id: int, shift: int):
+    """
+    Устанавливает ideology_shift для Action(id=action_id).
+    shift: -1 (влево), 0 (не изменять), 1 (вправо)
+    """
+    try:
+        async with get_session() as session:
+            user = (await session.execute(
+                select(User).where(User.tg_id == cb.from_user.id)
+            )).scalars().first()
+            action = (await session.execute(
+                select(Action).where(Action.id == action_id)
+            )).scalars().first()
+
+            if not user or not action:
+                await cb.answer("Не найдена заявка/пользователь.", show_alert=True)
+                return
+            if action.owner_id != user.id:
+                await cb.answer("Эта заявка принадлежит другому игроку.", show_alert=True)
+                return
+            if action.status in (ActionStatus.DONE, ActionStatus.FAILED, ActionStatus.DELETED):
+                await cb.answer("Действие уже зафиксировано и не может быть изменено.", show_alert=True)
+                return
+            if (action.influence or 0) <= 0:
+                await cb.answer("Для изменения идеологии нужно потратить влияние.", show_alert=True)
+                return
+
+            # Дополнительная валидация: проверяем, есть ли политик в районе
+            if action.district_id:
+                from db.models import Politician
+                politician = await session.execute(
+                    select(Politician).where(Politician.district_id == action.district_id)
+                )
+                politician = politician.scalars().first()
+                
+                if not politician:
+                    await cb.answer("В этом районе нет политика для влияния.", show_alert=True)
+                    return
+                
+                # Проверяем, не выйдет ли идеология за границы
+                if shift != 0:
+                    new_ideology = politician.ideology + shift
+                    if new_ideology < -5 or new_ideology > 5:
+                        await cb.answer(f"Идеология политика уже на границе ({politician.ideology}).", show_alert=True)
+                        return
+
+            action.ideology_shift = shift
+            await session.commit()
+
+        shift_names = {-1: "влево", 0: "не изменять", 1: "вправо"}
+        await cb.answer(f"Идеология политика: {shift_names[shift]} ✅")
+
+    except Exception:
+        logging.exception("_set_ideology_shift failed")
+        await cb.answer("Ошибка при изменении направления идеологии.", show_alert=True)

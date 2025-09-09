@@ -32,6 +32,10 @@
 {{ res_row("💰","деньги",r.money) }}
 {{ res_row("🪙","влияние",r.influence) }}
 {{ res_row("🧠","информация",r.information) }}
+{% if kind == 'attack' and r.influence and r.influence > 0 and action.ideology_shift is not none %}
+{% set shift_names = {-1: "влево", 0: "не изменять", 1: "вправо"} %}
+<b>🎯 Идеология политика:</b> {{ shift_names.get(action.ideology_shift, "не выбрано") }}
+{% endif %}
 {% else %}<b>🔧 Ресурсы:</b> всё по нулям{% endif %}{% endif %}
 
 {% if show_type %}

@@ -454,6 +454,9 @@ async def resolve_attacks(session: AsyncSession, rates: CombatRates, defense_poo
             log.info("Район '%s' стартовая оборона: %d", d.name, current_def)
 
             for a in attack_list:
+                # Сначала применяем изменение идеологии политика (если есть)
+                ideology_changed = await apply_ideology_shift(session, a)
+                
                 power_pts = resources_to_points(ATTACK_KIND, a, rates)
                 attacker = await get_user(a.owner_id)
                 attacker_name = (attacker.in_game_name or attacker.username or f"User#{attacker.id}") if attacker else "Неизвестный"
@@ -461,18 +464,25 @@ async def resolve_attacks(session: AsyncSession, rates: CombatRates, defense_poo
 
                 defender_user_before = await get_user(d.owner_id) if d.owner_id else None
 
-                log.debug("ATK@%s by %s: %d pts vs def %d", d.id, attacker_name, power_pts, current_def)
+                log.debug("ATK@%s by %s: %d pts vs def %d (ideology_changed: %s)", d.id, attacker_name, power_pts, current_def, ideology_changed)
 
                 if power_pts <= current_def:
                     current_def -= power_pts
+                    
+                    # Формируем текст новости с учетом изменения идеологии
+                    news_body = (
+                        f"Атака игрока {attacker_name} ({power_pts} очков) была отражена. "
+                        f"Фракция атакующего: {attacker_faction}. "
+                        f"Текущая оборона района: {current_def}."
+                    )
+                    
+                    if ideology_changed:
+                        news_body += f" Идеология политика района была изменена."
+                    
                     await add_news(
                         session,
                         title=f"Отражена атака на район '{d.name}'",
-                        body=(
-                            f"Атака игрока {attacker_name} ({power_pts} очков) была отражена. "
-                            f"Фракция атакующего: {attacker_faction}. "
-                            f"Текущая оборона района: {current_def}."
-                        ),
+                        body=news_body,
                         action_id=a.id,
                         district_id=d.id,
                     )
@@ -505,14 +515,20 @@ async def resolve_attacks(session: AsyncSession, rates: CombatRates, defense_poo
                     current_def = overflow
                     ownership_changes += 1
 
+                    # Формируем текст новости с учетом изменения идеологии
+                    capture_news_body = (
+                        f"Атака игрока {attacker_name} ({power_pts} очков) прорвала оборону района. "
+                        f"Фракция захватившего: {attacker_faction}. "
+                        f"Новый владелец — {attacker_name}. Остаток {overflow} очков укрепил оборону района."
+                    )
+                    
+                    if ideology_changed:
+                        capture_news_body += f" Идеология политика района была изменена."
+                    
                     await add_news(
                         session,
                         title=f"Район '{d.name}' захвачен!",
-                        body=(
-                            f"Атака игрока {attacker_name} ({power_pts} очков) прорвала оборону района. "
-                            f"Фракция захватившего: {attacker_faction}. "
-                            f"Новый владелец — {attacker_name}. Остаток {overflow} очков укрепил оборону района."
-                        ),
+                        body=capture_news_body,
                         action_id=a.id,
                         district_id=d.id,
                     )
@@ -646,6 +662,49 @@ async def close_all_scouting(session: AsyncSession):
                     "\n\nЧтобы продолжить наблюдение, запустите новую разведку."
                 )
                 await notify_user(bot, user.tg_id, title="🔍 Разведка завершена", body=body)
+
+
+# ===========================
+#  IDEOLOGY MANIPULATION
+# ===========================
+async def apply_ideology_shift(session: AsyncSession, action: Action) -> bool:
+    """
+    Применяет изменение идеологии политика на основе action.ideology_shift.
+    Возвращает True, если изменение было применено.
+    """
+    if not action.district_id or action.ideology_shift is None or action.ideology_shift == 0:
+        return False
+    
+    if (action.influence or 0) <= 0:
+        return False
+    
+    # Получаем политика района
+    politician = await session.execute(
+        select(Politician).where(Politician.district_id == action.district_id)
+    )
+    politician = politician.scalars().first()
+    
+    if not politician:
+        log.warning("Политик не найден для района %s", action.district_id)
+        return False
+    
+    # Вычисляем новую идеологию
+    new_ideology = politician.ideology + action.ideology_shift
+    new_ideology = max(-5, min(5, new_ideology))  # Ограничиваем границами
+    
+    if new_ideology == politician.ideology:
+        log.info("Идеология политика %s уже на границе, изменение не применено", politician.name)
+        return False
+    
+    old_ideology = politician.ideology
+    politician.ideology = new_ideology
+    
+    log.info(
+        "Идеология политика %s изменена: %d → %d (сдвиг: %d, влияние: %d)",
+        politician.name, old_ideology, new_ideology, action.ideology_shift, action.influence
+    )
+    
+    return True
 
 
 # ===========================

@@ -462,6 +462,12 @@ class Action(Base):
     estimated_power: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     on_point: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
+    # (NEW) Направление изменения идеологии политика (-1, 0, 1)
+    # -1: сдвиг влево (более левая идеология)
+    # 0: не изменять идеологию
+    # 1: сдвиг вправо (более правая идеология)
+    ideology_shift: Mapped[Optional[int]] = mapped_column(Integer, default=None, nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -471,6 +477,10 @@ class Action(Base):
     )
 
     text: Mapped[Optional[str]] = mapped_column(String(600), nullable=True)
+
+    __table_args__ = (
+        CheckConstraint("ideology_shift >= -1 AND ideology_shift <= 1", name="ck_actions_ideology_shift_range"),
+    )
 
     # простые CRUD
     @classmethod
@@ -488,7 +498,8 @@ class Action(Base):
             force: int = 0,
             money: int = 0,
             influence: int = 0,
-            information: int = 0
+            information: int = 0,
+            ideology_shift: Optional[int] = None
     ) -> "Action":
         obj = cls(
             owner_id=owner_id,
@@ -501,7 +512,8 @@ class Action(Base):
             force=force,
             money=money,
             influence=influence,
-            information=information
+            information=information,
+            ideology_shift=ideology_shift
         )
         session.add(obj)
         await session.commit()
