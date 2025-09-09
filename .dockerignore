@@ -12,3 +12,11 @@ dist/
 build/
 venv/
 .venv/
+logs/
+*.log
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

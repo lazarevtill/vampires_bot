@@ -2,46 +2,81 @@
 
 A Telegram bot built with aiogram for managing political districts and actions.
 
-## Quick Start
+## 🚀 Quick Start
 
-### 1. Setup
+### Option 1: Docker (Recommended)
+
+1. **Get your bot token:**
+   - Go to [@BotFather](https://t.me/BotFather) on Telegram
+   - Create a new bot or use existing one
+   - Copy the bot token
+
+2. **Configure environment:**
+   ```bash
+   cp .env.docker .env
+   # Edit .env and replace 'your_bot_token_here' with your actual token
+   ```
+
+3. **Start with Docker:**
+   ```bash
+   ./start-docker.sh
+   ```
+
+### Option 2: Local Development
+
+1. **Setup:**
+   ```bash
+   ./setup.sh
+   ```
+
+2. **Configure Bot Token:**
+   - Edit `.env` file and replace `your_bot_token_here` with your actual token
+
+3. **Run the Bot:**
+   ```bash
+   ./start.sh
+   ```
+
+## 🐳 Docker Setup
+
+The Docker setup includes:
+- **PostgreSQL Database** - Production-ready database
+- **Automatic Migrations** - Database schema is automatically applied
+- **Health Checks** - Ensures services are running properly
+- **Logging** - Centralized logging with volume mounts
+
+### Docker Commands
+
 ```bash
-./setup.sh
+# Start all services
+docker-compose up -d
+
+# View logs
+docker-compose logs -f bot
+docker-compose logs -f postgres
+
+# Stop services
+docker-compose down
+
+# Restart bot only
+docker-compose restart bot
+
+# Check service status
+docker-compose ps
 ```
 
-### 2. Configure Bot Token
-1. Go to [@BotFather](https://t.me/BotFather) on Telegram
-2. Create a new bot or use existing one
-3. Copy the bot token
-4. Edit `.env` file and replace `your_bot_token_here` with your actual token
+### Database Management
 
-### 3. Run the Bot
 ```bash
-./start.sh
+# Access PostgreSQL directly
+docker-compose exec postgres psql -U bot_user -d vampires_bot
+
+# Run migrations manually
+docker-compose exec bot alembic upgrade head
+
+# Create new migration
+docker-compose exec bot alembic revision --autogenerate -m "Description"
 ```
-
-## Manual Setup
-
-If you prefer manual setup:
-
-1. **Create virtual environment:**
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate
-   ```
-
-2. **Install dependencies:**
-   ```bash
-   pip install aiogram jinja2 sqlalchemy alembic aiosqlite asyncpg pydantic python-dotenv openpyxl
-   ```
-
-3. **Configure environment:**
-   - Copy `.env` file and update `BOT_TOKEN` with your bot token
-
-4. **Run the bot:**
-   ```bash
-   python app.py
-   ```
 
 ## Project Structure
 

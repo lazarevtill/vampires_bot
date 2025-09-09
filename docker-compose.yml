@@ -1,0 +1,66 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: vampires_bot_db
+    environment:
+      POSTGRES_DB: vampires_bot
+      POSTGRES_USER: bot_user
+      POSTGRES_PASSWORD: bot_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bot_user -d vampires_bot"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bot_network
+
+  # Bot Application
+  bot:
+    build: .
+    container_name: vampires_bot_app
+    environment:
+      - BOT_TOKEN=${BOT_TOKEN}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - DEFAULT_LOCALIZATION=${DEFAULT_LOCALIZATION:-ru}
+      - TEMPLATE_ROOT=templates
+      - BOT_NAME=${BOT_NAME:-Vampires Bot}
+      - DATABASE_URL=postgresql+asyncpg://bot_user:bot_password@postgres:5432/vampires_bot
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+    networks:
+      - bot_network
+    command: >
+      sh -c "
+        echo 'Waiting for database...' &&
+        sleep 5 &&
+        echo 'Running database migrations...' &&
+        alembic upgrade head &&
+        echo 'Starting bot...' &&
+        python app.py
+      "
+
+  # Optional: Redis for caching (if needed in future)
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: vampires_bot_redis
+  #   ports:
+  #     - "6379:6379"
+  #   networks:
+  #     - bot_network
+
+volumes:
+  postgres_data:
+
+networks:
+  bot_network:
+    driver: bridge
