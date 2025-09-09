@@ -88,13 +88,23 @@ class User(Base):
     first_name: Optional[str]
     last_name: Optional[str]
     in_game_name: Optional[str]
+    language_code: Optional[str]
+    money: int
+    influence: int
+    information: int
+    force: int
+    base_money: int
+    base_influence: int
+    base_information: int
+    base_force: int
+    ideology: int  # -5 to 5 range
+    faction: Optional[str]
+    available_actions: int
+    max_available_actions: Optional[int]
+    actions_refresh_at: Optional[datetime]
+    is_admin: bool
     created_at: datetime
     updated_at: datetime
-    
-    @classmethod
-    async def get_by_tg_id(cls, session: AsyncSession, tg_id: int) -> Optional['User']
-    @classmethod
-    async def create(cls, session: AsyncSession, tg_id: int, **kwargs) -> 'User'
 ```
 
 ### District Model
@@ -124,7 +134,7 @@ class Action(Base):
     information: int
     estimated_power: int
     on_point: bool
-    ideology_shift: Optional[int]
+    ideology_shift: Optional[int]  # NEW: Ideology shift functionality
     created_at: datetime
     updated_at: datetime
     text: Optional[str]
@@ -151,6 +161,17 @@ class News(Base):
     updated_at: datetime
 ```
 
+### UserScoutsDistrict Model
+```python
+# Association table for many-to-many relationship
+user_scouts_districts = Table(
+    "user_scouts_districts",
+    Base.metadata,
+    Column("user_id", ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
+    Column("district_id", ForeignKey("districts.id", ondelete="CASCADE"), primary_key=True),
+)
+```
+
 ## Route Handlers API
 
 ### Start Handler
@@ -167,64 +188,91 @@ async def main_menu_handler(callback: CallbackQuery, state: FSMContext):
     """Handle main menu navigation"""
 ```
 
-## Service Layer API
-
-### User Service
+### Options Handler
 ```python
-class UserService:
-    @staticmethod
-    async def get_or_create_user(session: AsyncSession, tg_id: int) -> User:
-        """Get existing user or create new one"""
-    
-    @staticmethod
-    async def update_user_profile(session: AsyncSession, user: User, **kwargs) -> User:
-        """Update user profile information"""
+@router.callback_query(F.data.startswith("options_"))
+async def options_handler(callback: CallbackQuery, state: FSMContext):
+    """Handle options and settings"""
 ```
 
-### District Service
+### Universal Handler
 ```python
-class DistrictService:
-    @staticmethod
-    async def get_all_districts(session: AsyncSession) -> List[District]:
-        """Get all available districts"""
-    
-    @staticmethod
-    async def get_district_by_id(session: AsyncSession, district_id: int) -> Optional[District]:
-        """Get district by ID"""
+@router.callback_query()
+async def universal_handler(callback: CallbackQuery, state: FSMContext):
+    """Handle universal callbacks"""
 ```
 
-### Action Service
+## Screen Components API
+
+### Main Menu Screen
 ```python
-class ActionService:
-    @staticmethod
-    async def create_action(session: AsyncSession, user_id: int, **kwargs) -> Action:
-        """Create new action"""
-    
-    @staticmethod
-    async def get_user_actions(session: AsyncSession, user_id: int) -> List[Action]:
-        """Get all actions for user"""
+class MainMenuScreen(BaseScreen):
+    async def _render(self, message, actor, state):
+        """Render main menu with user stats and options"""
 ```
 
-## Template API
-
-### Template Rendering
+### Profile Screen
 ```python
-class TemplateRenderer:
-    def __init__(self, template_root: str, default_locale: str):
-        self.template_root = template_root
-        self.default_locale = default_locale
-    
-    async def render(self, template_name: str, context: dict, locale: str = None) -> str:
-        """Render template with context"""
+class StatusScreen(BaseScreen):
+    async def _render(self, message, actor, state):
+        """Render user profile with stats and information"""
 ```
 
-### Template Context
-Templates receive the following context variables:
-- `user` - Current user object
-- `districts` - Available districts
-- `actions` - User actions
-- `news` - Recent news
-- `_` - Translation function
+### Actions Screen
+```python
+class ActionsScreen(BaseScreen):
+    async def _render(self, message, actor, state):
+        """Render actions list and management"""
+```
+
+### District List Screen
+```python
+class DistrictListScreen(BaseScreen):
+    async def _render(self, message, actor, state):
+        """Render district list with scouting options"""
+```
+
+### News List Screen
+```python
+class NewsListScreen(BaseScreen):
+    async def _render(self, message, actor, state):
+        """Render news list and management"""
+```
+
+### Communication Screen
+```python
+class CommunicateScreen(BaseScreen):
+    async def _render(self, message, actor, state):
+        """Render communication features"""
+```
+
+### Registration Screen
+```python
+class RegistrationScreen(BaseScreen):
+    async def _render(self, message, actor, state):
+        """Render user registration form"""
+```
+
+### Scout Action Screen
+```python
+class ScoutActionScreen(BaseScreen):
+    async def _render(self, message, actor, state):
+        """Render scouting action interface"""
+```
+
+### Settings Action Screen
+```python
+class SettingsActionScreen(BaseScreen):
+    async def _render(self, message, actor, state):
+        """Render action settings and configuration"""
+```
+
+### Notify Screen
+```python
+class NotifyScreen(BaseScreen):
+    async def _render(self, message, actor, state):
+        """Render notification interface"""
+```
 
 ## State Management API
 
@@ -254,6 +302,189 @@ async def process_name(message: Message, state: FSMContext):
     await state.update_data(name=name)
     await state.set_state(RegistrationStates.waiting_confirmation)
     # Send confirmation
+```
+
+## Text Handlers API
+
+### Registration Handler
+```python
+@router.message(RegistrationStates.waiting_name)
+async def register_name_handler(message: Message, state: FSMContext):
+    """Handle name registration input"""
+```
+
+### Communication Handler
+```python
+@router.message(CommunicateStates.waiting_news)
+async def communicate_handler(message: Message, state: FSMContext):
+    """Handle communication input"""
+```
+
+### Scout Info Handler
+```python
+@router.message(ScoutStates.waiting_question)
+async def scout_info_handler(message: Message, state: FSMContext):
+    """Handle scouting information input"""
+```
+
+## Keyboard API
+
+### Keyboard Renderer
+```python
+class KeyboardRenderer:
+    def render(self, spec: KeyboardSpec) -> InlineKeyboardMarkup:
+        """Render keyboard from specification"""
+```
+
+### Keyboard Presets
+```python
+class KeyboardPresets:
+    @staticmethod
+    def main_menu() -> InlineKeyboardMarkup:
+        """Main menu keyboard"""
+    
+    @staticmethod
+    def actions_menu() -> InlineKeyboardMarkup:
+        """Actions menu keyboard"""
+    
+    @staticmethod
+    def district_list() -> InlineKeyboardMarkup:
+        """District list keyboard"""
+```
+
+### Keyboard Specifications
+```python
+class KeyboardSpec:
+    buttons: List[ButtonSpec]
+    layout: List[List[str]]
+    
+class ButtonSpec:
+    text: str
+    callback_data: str
+    url: Optional[str] = None
+```
+
+## Options System API
+
+### Options Registry
+```python
+class OptionsRegistry:
+    def register(self, name: str, option: BaseOption):
+        """Register an option"""
+    
+    def get(self, name: str) -> BaseOption:
+        """Get an option by name"""
+    
+    def list_all(self) -> List[BaseOption]:
+        """List all registered options"""
+```
+
+### Base Option
+```python
+class BaseOption:
+    name: str
+    title: str
+    description: str
+    
+    async def render(self, user: User) -> str:
+        """Render option content"""
+    
+    async def handle_callback(self, callback: CallbackQuery, user: User):
+        """Handle option callback"""
+```
+
+### Specific Options
+```python
+class MainMenuOption(BaseOption):
+    """Main menu option handler"""
+
+class ActionsMenuOption(BaseOption):
+    """Actions menu option handler"""
+
+class DistrictListMenuOption(BaseOption):
+    """District list menu option handler"""
+
+class NewsListOption(BaseOption):
+    """News list option handler"""
+
+class ScoutMenuOption(BaseOption):
+    """Scout menu option handler"""
+
+class CommunicateOption(BaseOption):
+    """Communication option handler"""
+
+class ActionsStatsOption(BaseOption):
+    """Action statistics option handler"""
+
+class ActionSetupMenuOption(BaseOption):
+    """Action setup menu option handler"""
+```
+
+## Service Layer API
+
+### Message Store Service
+```python
+class MessageStoreService:
+    @staticmethod
+    async def store_message(user_id: int, message_data: dict):
+        """Store message data"""
+    
+    @staticmethod
+    async def get_messages(user_id: int) -> List[dict]:
+        """Get stored messages for user"""
+```
+
+### Notification Service
+```python
+class NotificationService:
+    @staticmethod
+    async def send_notification(user_id: int, message: str):
+        """Send notification to user"""
+    
+    @staticmethod
+    async def broadcast_to_district(district_id: int, message: str):
+        """Broadcast message to district users"""
+```
+
+## Template API
+
+### Template Rendering
+```python
+class TemplateRenderer:
+    def __init__(self, template_root: str, default_locale: str):
+        self.template_root = template_root
+        self.default_locale = default_locale
+    
+    async def render(self, template_name: str, context: dict, locale: str = None) -> str:
+        """Render template with context"""
+```
+
+### Template Context
+Templates receive the following context variables:
+- `user` - Current user object
+- `districts` - Available districts
+- `actions` - User actions
+- `news` - Recent news
+- `_` - Translation function
+
+## Utility Functions
+
+### Callback Utilities
+```python
+def parse_callback_data(data: str) -> dict:
+    """Parse callback data string"""
+    
+def build_callback_data(**kwargs) -> str:
+    """Build callback data string"""
+```
+
+### Render Utilities
+```python
+def format_number(number: int) -> str:
+    """Format number for display"""
+    
+def format_datetime(dt: datetime) -> str:
+    """Format datetime for display"""
 ```
 
 ## Error Handling API
@@ -299,24 +530,32 @@ logger.error("Database connection failed", exc_info=True)
 logger.debug("Debug information")
 ```
 
-## Utility Functions
+## Excel Integration API
 
-### Text Processing
+### Excel Import
 ```python
-def sanitize_text(text: str) -> str:
-    """Sanitize user input text"""
+class ExcelImporter:
+    def import_users(self, file_path: str) -> List[User]:
+        """Import users from Excel file"""
     
-def format_number(number: int) -> str:
-    """Format number for display"""
+    def import_districts(self, file_path: str) -> List[District]:
+        """Import districts from Excel file"""
+    
+    def import_actions(self, file_path: str) -> List[Action]:
+        """Import actions from Excel file"""
 ```
 
-### Validation
+### Excel Templates
 ```python
-def validate_username(username: str) -> bool:
-    """Validate username format"""
+class ExcelTemplates:
+    def create_user_template(self) -> str:
+        """Create user import template"""
     
-def validate_action_data(data: dict) -> bool:
-    """Validate action data"""
+    def create_district_template(self) -> str:
+        """Create district import template"""
+    
+    def create_action_template(self) -> str:
+        """Create action import template"""
 ```
 
 ## External Integrations

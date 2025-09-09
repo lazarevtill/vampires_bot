@@ -6,8 +6,8 @@
 
 - Python 3.10+
 - Docker and Docker Compose
-- Git
 - Telegram Bot Token (for testing)
+- Git
 
 ### Development Setup
 
@@ -38,8 +38,7 @@
 
 ### Branch Strategy
 
-- `main` - Production-ready code
-- `feature/docker-postgresql-setup` - Docker and PostgreSQL setup
+- `feature/docker-postgresql-setup` - Main development branch with Docker setup
 - `feature/*` - New features
 - `bugfix/*` - Bug fixes
 - `hotfix/*` - Critical fixes
@@ -245,6 +244,32 @@ async def create_action(
    ```python
    from middlewares.new_middleware import NewMiddleware
    dp.update.middleware(NewMiddleware())
+   ```
+
+### Adding New Options
+
+1. **Create option class**:
+   ```python
+   from options.registry import BaseOption
+   
+   class NewOption(BaseOption):
+       name = "new_option"
+       title = "New Option"
+       description = "Description of the new option"
+       
+       async def render(self, user: User) -> str:
+           return "Option content"
+       
+       async def handle_callback(self, callback: CallbackQuery, user: User):
+           # Handle option callback
+           pass
+   ```
+
+2. **Register option**:
+   ```python
+   from options.registry import registry
+   
+   registry.register("new_option", NewOption())
    ```
 
 ## Testing

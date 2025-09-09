@@ -5,7 +5,7 @@ description: Project structure and architecture guide for Vampires Bot
 
 # Vampires Bot Project Structure
 
-This is a Telegram bot built with aiogram for managing political districts and actions.
+This is a Telegram bot built with aiogram 3.x for managing political districts and actions.
 
 ## Core Architecture
 
@@ -13,31 +13,86 @@ This is a Telegram bot built with aiogram for managing political districts and a
 - **Configuration**: [config.py](mdc:config.py) - Application configuration management
 - **Database Config**: [db/config.py](mdc:db/config.py) - Database connection configuration
 - **Database Session**: [db/session.py](mdc:db/session.py) - SQLAlchemy session management
+- **Database Models**: [db/models.py](mdc:db/models.py) - All database models and relationships
 
 ## Key Directories
 
 - `routes/` - Bot command handlers and routing
-- `middlewares/` - Middleware components (timing, user registration)
+  - [start.py](mdc:routes/start.py) - Start command and main menu
+  - [options.py](mdc:routes/options.py) - Options and settings
+  - [universal.py](mdc:routes/universal.py) - Universal handlers
+  - [start_support.py](mdc:routes/start_support.py) - Support functionality
+
+- `middlewares/` - Middleware components
+  - [timing.py](mdc:middlewares/timing.py) - Request timing middleware
+  - [user_registration.py](mdc:middlewares/user_registration.py) - User registration middleware
+
 - `screens/` - UI screen components and templates
+  - [base.py](mdc:screens/base.py) - Base screen class
+  - [main_menu.py](mdc:screens/main_menu.py) - Main menu screen
+  - [profile.py](mdc:screens/profile.py) - User profile screen
+  - [actions.py](mdc:screens/actions.py) - Actions management
+  - [district_list.py](mdc:screens/district_list.py) - District listing
+  - [news_list.py](mdc:screens/news_list.py) - News management
+  - [communicate_screen.py](mdc:screens/communicate_screen.py) - Communication features
+  - [registration_screen.py](mdc:screens/registration_screen.py) - User registration
+  - [scout_action.py](mdc:screens/scout_action.py) - Scouting actions
+  - [settings_action.py](mdc:screens/settings_action.py) - Action settings
+  - [notify_screen.py](mdc:screens/notify_screen.py) - Notifications
+
 - `templates/` - Jinja2 message templates (Russian localization)
+
 - `db/` - Database models and operations
+  - [models.py](mdc:db/models.py) - SQLAlchemy database models
+  - [session.py](mdc:db/session.py) - Database session management
+  - [config.py](mdc:db/config.py) - Database configuration
+
 - `services/` - Business logic services
+  - [message_store.py](mdc:services/message_store.py) - Message storage service
+  - [notify.py](mdc:services/notify.py) - Notification service
+
 - `keyboards/` - Inline keyboard components
+  - [renderer.py](mdc:keyboards/renderer.py) - Keyboard rendering
+  - [presets.py](mdc:keyboards/presets.py) - Keyboard presets
+  - [spec.py](mdc:keyboards/spec.py) - Keyboard specifications
+  - [presets_actions_stats.py](mdc:keyboards/presets_actions_stats.py) - Action stats keyboards
+
 - `states/` - FSM (Finite State Machine) states
+  - [registration.py](mdc:states/registration.py) - Registration states
+  - [communicate.py](mdc:states/communicate.py) - Communication states
+  - [scout.py](mdc:states/scout.py) - Scouting states
+
 - `text_handlers/` - Text message handlers
+  - [register_name.py](mdc:text_handlers/register_name.py) - Name registration
+  - [communicate.py](mdc:text_handlers/communicate.py) - Communication handling
+  - [scout_info.py](mdc:text_handlers/scout_info.py) - Scouting information
+
 - `options/` - Configuration options system
+  - [registry.py](mdc:options/registry.py) - Options registry
+  - [main_menu.py](mdc:options/main_menu.py) - Main menu options
+  - [actions_menu.py](mdc:options/actions_menu.py) - Actions menu options
+  - [district_list_menu.py](mdc:options/district_list_menu.py) - District list options
+  - [news_list.py](mdc:options/news_list.py) - News list options
+  - [scout_menu.py](mdc:options/scout_menu.py) - Scout menu options
+  - [communicate.py](mdc:options/communicate.py) - Communication options
+  - [actions_stats.py](mdc:options/actions_stats.py) - Action statistics
+  - [action_setup_menu.py](mdc:options/action_setup_menu.py) - Action setup options
+
 - `utils/` - Utility functions
+  - [callback.py](mdc:utils/callback.py) - Callback utilities
+  - [render.py](mdc:utils/render.py) - Rendering utilities
+
 - `alembic/` - Database migrations
 
 ## Database Models
 
 The bot uses SQLAlchemy with the following main models:
-- `users` - User information and registration
-- `districts` - Political districts
-- `actions` - Political actions and activities
-- `politicians` - Politician data
-- `news` - News articles
-- `user_scouts_districts` - User-district relationships
+- `User` - User information and registration with game stats
+- `District` - Political districts
+- `Action` - Political actions and activities with ideology shifts
+- `Politician` - Politician data
+- `News` - News articles
+- `UserScoutsDistrict` - User-district scouting relationships
 
 ## Docker Setup
 
@@ -45,9 +100,19 @@ The bot uses SQLAlchemy with the following main models:
 - [Dockerfile](mdc:Dockerfile) - Bot container definition
 - [docker-entrypoint.sh](mdc:docker-entrypoint.sh) - Container startup with migrations
 - [DOCKER.md](mdc:DOCKER.md) - Complete Docker documentation
+- [start-docker.sh](mdc:start-docker.sh) - Easy Docker startup
+- [test-docker.sh](mdc:test-docker.sh) - Docker testing suite
 
 ## Environment Configuration
 
 - [.env.docker](mdc:.env.docker) - Docker environment template
 - [.env](mdc:.env) - Local environment configuration
 - [config.py](mdc:config.py) - Configuration loading and validation
+
+## Additional Files
+
+- [excel_import.py](mdc:excel_import.py) - Excel import functionality
+- [excel_templates.py](mdc:excel_templates.py) - Excel template management
+- [commands.py](mdc:commands.py) - Bot commands
+- [setup.sh](mdc:setup.sh) - Local setup script
+- [start.sh](mdc:start.sh) - Local startup script

@@ -5,13 +5,15 @@ A sophisticated Telegram bot built with aiogram 3.x for managing political distr
 ## ✨ Features
 
 - **Political District Management** - Create and manage political districts
-- **Action Tracking** - Track political actions and activities
-- **User Registration** - Comprehensive user management system
-- **News System** - Distribute news and updates
-- **Multi-language Support** - Russian localization with template system
+- **Action Tracking** - Track political actions and activities with ideology shifts
+- **User Registration** - Comprehensive user management system with profiles
+- **News System** - Distribute news and updates to districts
+- **Scouting System** - User-district scouting relationships
+- **Multi-language Support** - Russian localization with Jinja2 templates
 - **Database Migrations** - Automatic schema management with Alembic
 - **Docker Deployment** - Production-ready containerized setup
 - **Health Monitoring** - Built-in health checks and logging
+- **Excel Integration** - Import/export functionality for data management
 
 ## 🚀 Quick Start
 
@@ -104,25 +106,70 @@ vampires_bot/
 ├── config.py              # Configuration management
 ├── logging_config.py      # Logging configuration
 ├── routes/                # Bot command handlers and routing
-├── middlewares/           # Middleware components (timing, user registration)
+│   ├── start.py          # Start command and main menu
+│   ├── options.py        # Options and settings
+│   ├── universal.py      # Universal handlers
+│   └── start_support.py  # Support functionality
+├── middlewares/           # Middleware components
+│   ├── timing.py         # Request timing middleware
+│   └── user_registration.py # User registration middleware
 ├── screens/               # UI screen components and templates
+│   ├── base.py           # Base screen class
+│   ├── main_menu.py      # Main menu screen
+│   ├── profile.py        # User profile screen
+│   ├── actions.py        # Actions management
+│   ├── district_list.py  # District listing
+│   ├── news_list.py      # News management
+│   ├── communicate_screen.py # Communication features
+│   ├── registration_screen.py # User registration
+│   ├── scout_action.py   # Scouting actions
+│   ├── settings_action.py # Action settings
+│   └── notify_screen.py  # Notifications
 ├── templates/             # Jinja2 message templates (Russian localization)
 ├── db/                    # Database models and operations
-│   ├── models.py          # SQLAlchemy database models
-│   ├── session.py         # Database session management
-│   └── config.py          # Database configuration
+│   ├── models.py         # SQLAlchemy database models
+│   ├── session.py        # Database session management
+│   └── config.py         # Database configuration
 ├── services/              # Business logic services
+│   ├── message_store.py  # Message storage service
+│   └── notify.py         # Notification service
 ├── keyboards/             # Inline keyboard components
+│   ├── renderer.py       # Keyboard rendering
+│   ├── presets.py        # Keyboard presets
+│   ├── spec.py           # Keyboard specifications
+│   └── presets_actions_stats.py # Action stats keyboards
 ├── states/                # FSM (Finite State Machine) states
+│   ├── registration.py   # Registration states
+│   ├── communicate.py    # Communication states
+│   └── scout.py          # Scouting states
 ├── text_handlers/         # Text message handlers
+│   ├── register_name.py  # Name registration
+│   ├── communicate.py    # Communication handling
+│   └── scout_info.py     # Scouting information
 ├── options/               # Configuration options system
+│   ├── registry.py       # Options registry
+│   ├── main_menu.py      # Main menu options
+│   ├── actions_menu.py   # Actions menu options
+│   ├── district_list_menu.py # District list options
+│   ├── news_list.py      # News list options
+│   ├── scout_menu.py     # Scout menu options
+│   ├── communicate.py    # Communication options
+│   ├── actions_stats.py  # Action statistics
+│   └── action_setup_menu.py # Action setup options
 ├── utils/                 # Utility functions
+│   ├── callback.py       # Callback utilities
+│   └── render.py         # Rendering utilities
 ├── alembic/               # Database migrations
 ├── docker-compose.yml     # Docker services configuration
 ├── Dockerfile             # Bot container definition
 ├── docker-entrypoint.sh   # Container startup script
 ├── start-docker.sh        # Easy Docker startup
 ├── test-docker.sh         # Docker testing suite
+├── setup.sh               # Local setup script
+├── start.sh               # Local startup script
+├── excel_import.py        # Excel import functionality
+├── excel_templates.py     # Excel template management
+├── commands.py            # Bot commands
 └── docs/                  # Comprehensive documentation
 ```
 
@@ -130,12 +177,35 @@ vampires_bot/
 
 The bot uses PostgreSQL with the following main entities:
 
-- **Users** - User registration and profile information
-- **Districts** - Political districts management
-- **Actions** - Political actions and activities
-- **Politicians** - Politician data and information
+### Core Models
+
+- **User** - User registration and profile information
+  - Telegram ID, username, names
+  - Game stats: money, influence, information, force
+  - Ideology and faction
+  - Action limits and refresh timers
+  - Admin status
+
+- **District** - Political districts management
+  - Name and description
+  - Creation and update timestamps
+
+- **Action** - Political actions and activities
+  - Action type, title, status
+  - Owner and district relationships
+  - Resource costs: force, money, influence, information
+  - Ideology shift functionality
+  - Parent-child action relationships
+
+- **Politician** - Politician data and information
+  - Name and district association
+
 - **News** - News articles and updates
+  - Title, content, district association
+  - Creation and update timestamps
+
 - **UserScoutsDistrict** - Many-to-many relationships between users and districts
+  - Scouting relationships and permissions
 
 ## 🛠️ Technology Stack
 
@@ -146,6 +216,7 @@ The bot uses PostgreSQL with the following main entities:
 - **Containerization**: Docker & Docker Compose
 - **Language**: Python 3.10+
 - **Architecture**: Modular with clear separation of concerns
+- **Excel Support**: openpyxl for data import/export
 
 ## 📚 Documentation
 
@@ -224,3 +295,5 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - [ ] API endpoints for external integrations
 - [ ] Advanced user role management
 - [ ] Real-time notifications system
+- [ ] Advanced scouting features
+- [ ] Political simulation enhancements
