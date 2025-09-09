@@ -39,15 +39,6 @@ services:
     restart: unless-stopped
     networks:
       - bot_network
-    command: >
-      sh -c "
-        echo 'Waiting for database...' &&
-        sleep 5 &&
-        echo 'Running database migrations...' &&
-        alembic upgrade head &&
-        echo 'Starting bot...' &&
-        python app.py
-      "
 
   # Optional: Redis for caching (if needed in future)
   # redis:
