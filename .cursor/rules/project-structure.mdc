@@ -1,0 +1,53 @@
+---
+alwaysApply: true
+description: Project structure and architecture guide for Vampires Bot
+---
+
+# Vampires Bot Project Structure
+
+This is a Telegram bot built with aiogram for managing political districts and actions.
+
+## Core Architecture
+
+- **Main Entry Point**: [app.py](mdc:app.py) - Bot application startup and configuration
+- **Configuration**: [config.py](mdc:config.py) - Application configuration management
+- **Database Config**: [db/config.py](mdc:db/config.py) - Database connection configuration
+- **Database Session**: [db/session.py](mdc:db/session.py) - SQLAlchemy session management
+
+## Key Directories
+
+- `routes/` - Bot command handlers and routing
+- `middlewares/` - Middleware components (timing, user registration)
+- `screens/` - UI screen components and templates
+- `templates/` - Jinja2 message templates (Russian localization)
+- `db/` - Database models and operations
+- `services/` - Business logic services
+- `keyboards/` - Inline keyboard components
+- `states/` - FSM (Finite State Machine) states
+- `text_handlers/` - Text message handlers
+- `options/` - Configuration options system
+- `utils/` - Utility functions
+- `alembic/` - Database migrations
+
+## Database Models
+
+The bot uses SQLAlchemy with the following main models:
+- `users` - User information and registration
+- `districts` - Political districts
+- `actions` - Political actions and activities
+- `politicians` - Politician data
+- `news` - News articles
+- `user_scouts_districts` - User-district relationships
+
+## Docker Setup
+
+- [docker-compose.yml](mdc:docker-compose.yml) - Multi-service Docker setup with PostgreSQL
+- [Dockerfile](mdc:Dockerfile) - Bot container definition
+- [docker-entrypoint.sh](mdc:docker-entrypoint.sh) - Container startup with migrations
+- [DOCKER.md](mdc:DOCKER.md) - Complete Docker documentation
+
+## Environment Configuration
+
+- [.env.docker](mdc:.env.docker) - Docker environment template
+- [.env](mdc:.env) - Local environment configuration
+- [config.py](mdc:config.py) - Configuration loading and validation

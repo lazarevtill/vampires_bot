@@ -1,0 +1,63 @@
+---
+globs: docker-compose.yml,Dockerfile,docker-entrypoint.sh,*.sh
+description: Docker development workflow and deployment guidelines
+---
+
+# Docker Development Workflow
+
+## Docker Setup
+
+The project uses Docker Compose with PostgreSQL for development and production.
+
+### Key Files
+
+- [docker-compose.yml](mdc:docker-compose.yml) - Multi-service setup with PostgreSQL database
+- [Dockerfile](mdc:Dockerfile) - Optimized bot container with all dependencies
+- [docker-entrypoint.sh](mdc:docker-entrypoint.sh) - Startup script with automatic migrations
+- [start-docker.sh](mdc:start-docker.sh) - Easy startup script for development
+- [test-docker.sh](mdc:test-docker.sh) - Comprehensive Docker testing
+
+### Environment Configuration
+
+- [.env.docker](mdc:.env.docker) - Docker environment template
+- [init-db.sql](mdc:init-db.sql) - PostgreSQL initialization script
+
+## Development Workflow
+
+1. **Start Development Environment**:
+   ```bash
+   ./start-docker.sh
+   ```
+
+2. **View Logs**:
+   ```bash
+   docker-compose logs -f bot
+   ```
+
+3. **Database Operations**:
+   ```bash
+   # Access PostgreSQL
+   docker-compose exec postgres psql -U bot_user -d vampires_bot
+   
+   # Run migrations
+   docker-compose exec bot alembic upgrade head
+   ```
+
+4. **Testing**:
+   ```bash
+   ./test-docker.sh
+   ```
+
+## Database Migrations
+
+- All migrations are in [alembic/versions/](mdc:alembic/versions/)
+- Migrations run automatically on container startup
+- Use `alembic revision --autogenerate` for new migrations
+- Test migrations locally before committing
+
+## Production Deployment
+
+- Use the same Docker setup for production
+- Ensure proper environment variables are set
+- Use Docker secrets for sensitive data
+- Monitor logs and health checks

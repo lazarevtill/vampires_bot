@@ -1,0 +1,50 @@
+---
+globs: db/*.py,alembic/*.py
+description: Database patterns and migration guidelines
+---
+
+# Database Patterns and Guidelines
+
+## Database Configuration
+
+- **Config**: [db/config.py](mdc:db/config.py) - Database URL configuration
+- **Session**: [db/session.py](mdc:db/session.py) - SQLAlchemy async session management
+- **Models**: [db/models.py](mdc:db/models.py) - All database models
+
+## Database Models
+
+The bot uses the following main models:
+
+- `User` - User registration and profile information
+- `District` - Political districts management
+- `Action` - Political actions and activities
+- `Politician` - Politician data and information
+- `News` - News articles and updates
+- `UserScoutsDistrict` - Many-to-many relationship between users and districts
+
+## Migration Guidelines
+
+- **Alembic Config**: [alembic/env.py](mdc:alembic/env.py) - Migration environment setup
+- **Migration Files**: [alembic/versions/](mdc:alembic/versions/) - All migration files
+
+### Creating Migrations
+
+1. Make changes to models in [db/models.py](mdc:db/models.py)
+2. Generate migration: `alembic revision --autogenerate -m "Description"`
+3. Review generated migration file
+4. Test migration: `alembic upgrade head`
+5. Commit migration file
+
+### Database Operations
+
+- Always use async sessions from [db/session.py](mdc:db/session.py)
+- Use proper error handling for database operations
+- Follow the pattern: `async with get_session() as session:`
+- Use type hints for all database operations
+
+## PostgreSQL Specific
+
+- The project uses PostgreSQL in Docker
+- Connection string: `postgresql+asyncpg://bot_user:bot_password@postgres:5432/vampires_bot`
+- All migrations are PostgreSQL compatible
+- Use proper indexing for performance

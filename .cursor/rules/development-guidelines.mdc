@@ -1,0 +1,42 @@
+---
+globs: *.py
+description: Python development guidelines and coding standards
+---
+
+# Development Guidelines
+
+## Code Style and Standards
+
+- Use type hints for all function parameters and return values
+- Follow PEP 8 style guidelines
+- Use descriptive variable and function names
+- Add docstrings for all public functions and classes
+- Use async/await for all database operations
+
+## Database Operations
+
+- Always use the async session from [db/session.py](mdc:db/session.py)
+- Use proper error handling for database operations
+- Follow the pattern in [db/models.py](mdc:db/models.py) for model definitions
+- Use Alembic for all database schema changes
+
+## Bot Development
+
+- Use aiogram 3.x patterns and best practices
+- Implement proper error handling in all handlers
+- Use FSM states for multi-step user interactions
+- Follow the middleware pattern in [middlewares/](mdc:middlewares/)
+- Use the screen pattern in [screens/](mdc:screens/) for UI components
+
+## Configuration Management
+
+- Use [config.py](mdc:config.py) for application configuration
+- Use environment variables for sensitive data
+- Follow the pattern in [options/](mdc:options/) for feature flags
+
+## Testing and Quality
+
+- Test all database migrations before deployment
+- Use the Docker setup for consistent development environment
+- Follow the logging patterns in [logging_config.py](mdc:logging_config.py)
+- Validate all user inputs and handle errors gracefully
