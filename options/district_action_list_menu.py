@@ -87,7 +87,7 @@ async def action_district_menu_pick(cb: types.CallbackQuery, state: FSMContext, 
     action_kind = kwargs.get("action")
     data = await state.get_data()
     idx = int(data.get("district_list_index", 0))
-    print("INDEX", idx)
+    logging.info("action_district_menu_pick: action_kind=%s, district_list_index=%s", action_kind, idx)
     async with get_session() as session:
         user = await User.get_by_tg_id(session, cb.from_user.id)
 
@@ -109,8 +109,12 @@ async def action_district_menu_pick(cb: types.CallbackQuery, state: FSMContext, 
         district_id = picked.id
 
         # 4) Лог/действие с выбранным районом
-        logging.info("Picked district: id=%s name=%s (idx=%s of %s)",
-                     district_id, picked.name, idx, len(rows))
+        logging.info("Picked district: id=%s name=%s (idx=%s of %s) for action_kind=%s",
+                     district_id, picked.name, idx, len(rows), action_kind)
+        
+        # Логируем все доступные округа для отладки
+        all_districts = [(d.id, d.name) for d in rows]
+        logging.info("Available districts: %s", all_districts)
 
         action_type = ActionType.INDIVIDUAL if action_kind in ["defend", "attack"] else ActionType.SCOUT_DISTRICT
         information = 1 if action_kind in ["scout"] else 0

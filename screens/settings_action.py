@@ -74,14 +74,20 @@ class DistrictActionList(BaseScreen):
 
         if state:
             data = await state.get_data()
-            idx = int(data.get("district_list_index", 0))
         else:
+            data = {}
+
+        # Если на экран пришли без move — считаем это «первым входом» и сбрасываем индекс.
+        if move is None:
             idx = 0
-        # прокрутка
-        if move == "next":
-            idx = (idx + 1) % len(rows)
-        elif move == "prev":
-            idx = (idx - 1) % len(rows)
+            logging.info("DistrictActionList: first entry, resetting index to 0")
+        else:
+            idx = int(data.get("district_list_index", 0))
+            if move == "next":
+                idx = (idx + 1) % len(rows)
+            elif move == "prev":
+                idx = (idx - 1) % len(rows)
+            logging.info("DistrictActionList: move=%s, index=%s", move, idx)
 
         # на всякий — clamp, если число районов изменилось
         if idx >= len(rows) or idx < 0:
@@ -92,6 +98,9 @@ class DistrictActionList(BaseScreen):
 
         district = rows[idx]
         info = {"count": len(rows), "index": idx + 1}
+        
+        logging.info("DistrictActionList: selected district id=%s name=%s (index=%s of %s)", 
+                     district.id, district.name, idx, len(rows))
 
         async with get_session() as session:
             pols = await Politician.by_district(session, district.id)
