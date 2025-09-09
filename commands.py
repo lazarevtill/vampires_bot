@@ -285,6 +285,66 @@ def resources_to_points(kind: str, action: Action, rates: CombatRates) -> int:
     return max(0, pts)
 
 
+async def resources_to_points_with_bonuses(kind: str, action: Action, rates: CombatRates, session: AsyncSession) -> int:
+    """Конвертирует ресурсы экшена в очки с учётом бонусов от политиков."""
+    # Базовые очки
+    base_pts = resources_to_points(kind, action, rates)
+    
+    if not action.district_id:
+        return base_pts
+    
+    # Получаем политика района
+    pol_res = await session.execute(
+        select(Politician).where(Politician.district_id == action.district_id)
+    )
+    politician = pol_res.scalars().first()
+    
+    if not politician or not politician.bonuses_penalties:
+        return base_pts
+    
+    # Получаем название района
+    district_res = await session.execute(
+        select(District).where(District.id == action.district_id)
+    )
+    district = district_res.scalars().first()
+    district_name = district.name if district else None
+    
+    # Вычисляем бонусы для действия
+    from utils.bonus_system import BonusCalculator, BonusType
+    
+    bonuses = BonusCalculator.calculate_action_bonuses(
+        action_kind=action.kind,
+        district_id=action.district_id,
+        district_name=district_name,
+        politician=politician,
+        action_type=action.type.value
+    )
+    
+    # Применяем бонусы к очкам
+    bonus_pts = 0
+    table = rates.attack if kind == ATTACK_KIND else rates.defense
+    
+    for bonus_type, bonus_value in bonuses.items():
+        if bonus_value == 0:
+            continue
+            
+        if bonus_type == BonusType.FORCE:
+            bonus_pts += bonus_value * float(table.get("force", 0))
+        elif bonus_type == BonusType.MONEY:
+            bonus_pts += bonus_value * float(table.get("money", 0))
+        elif bonus_type == BonusType.INFLUENCE:
+            bonus_pts += bonus_value * float(table.get("influence", 0))
+        elif bonus_type == BonusType.INFORMATION:
+            bonus_pts += bonus_value * float(table.get("information", 0))
+    
+    total_pts = base_pts + int(round(bonus_pts))
+    
+    if bonus_pts != 0:
+        log.debug(f"Бонус к действию {action.id}: +{int(round(bonus_pts))} очков (базовые: {base_pts}, итого: {total_pts})")
+    
+    return max(0, total_pts)
+
+
 # ===========================
 #  CONTESTED DETECTION
 # ===========================
@@ -362,7 +422,7 @@ async def resolve_defense_pools(session: AsyncSession, rates: CombatRates, conte
             did = a.district_id
             if did is None or did in contested_set:
                 continue
-            pts = resources_to_points(DEFENSE_KIND, a, rates)
+            pts = await resources_to_points_with_bonuses(DEFENSE_KIND, a, rates, session)
             defense_pool[did] += pts
             used_ids.append(a.id)
             log.debug("DEF@%s: +%d очков (action #%s)", did, pts, a.id)
@@ -457,7 +517,7 @@ async def resolve_attacks(session: AsyncSession, rates: CombatRates, defense_poo
                 # Сначала применяем изменение идеологии политика (если есть)
                 ideology_changed = await apply_ideology_shift(session, a)
                 
-                power_pts = resources_to_points(ATTACK_KIND, a, rates)
+                power_pts = await resources_to_points_with_bonuses(ATTACK_KIND, a, rates, session)
                 attacker = await get_user(a.owner_id)
                 attacker_name = (attacker.in_game_name or attacker.username or f"User#{attacker.id}") if attacker else "Неизвестный"
                 attacker_faction = (attacker.faction or "без фракции") if attacker else "неизвестно"
@@ -857,6 +917,120 @@ async def grant_users_base_resources(session: AsyncSession):
 
 
 # ===========================
+#    DISTRICT DEFENSE BONUSES
+# ===========================
+async def grant_district_defense_bonuses(session: AsyncSession, contested: List[int]):
+    """Начисляет фиксированные бонусы за защиту района в цикл на основе политиков."""
+    with StepTimer("Начисление бонусов за защиту района"):
+        # Бот для уведомлений (если есть)
+        try:
+            from app import bot  # type: ignore
+        except Exception:
+            bot = None
+            log.warning("Бот недоступен: уведомления о бонусах отправляться не будут.")
+
+        res = await session.execute(select(District))
+        districts: List[District] = list(res.scalars().all())
+        if not districts:
+            log.info("Районов нет — бонусы начислять некому.")
+            return
+
+        contested_set = set(contested)
+        control_point_bonuses: Dict[int, int] = defaultdict(int)  # user_id -> total_bonus
+        per_owner_breakdown: Dict[int, List[tuple[str, int]]] = defaultdict(list)
+
+        for d in districts:
+            if d.id in contested_set:
+                log.debug("Район '%s' спорный — пропуск бонусов.", d.name)
+                continue
+
+            # Получаем политика района
+            pol_res = await session.execute(
+                select(Politician).where(Politician.district_id == d.id)
+            )
+            politician = pol_res.scalars().first()
+
+            if not politician or not politician.bonuses_penalties:
+                continue
+
+            # Импортируем систему бонусов
+            from utils.bonus_system import BonusCalculator, BonusType
+
+            # Вычисляем бонусы за защиту района
+            bonuses = BonusCalculator.calculate_defense_bonuses(
+                district_id=d.id,
+                politician=politician,
+                district_name=d.name,
+                district_ideology=politician.ideology
+            )
+
+            # Применяем бонусы к очкам контроля
+            control_bonus = bonuses.get(BonusType.CONTROL_POINTS, 0)
+            if control_bonus > 0:
+                control_point_bonuses[d.owner_id] += control_bonus
+                per_owner_breakdown[d.owner_id].append((d.name, control_bonus))
+                log.info(f"Бонус за защиту района '{d.name}': +{control_bonus} ОК (политик: {politician.name})")
+
+        # Начисляем бонусы к control_points районов
+        total_bonuses = 0
+        for uid, bonus in control_point_bonuses.items():
+            if bonus <= 0:
+                continue
+
+            # Получаем районы пользователя
+            user_districts = await session.execute(
+                select(District).where(District.owner_id == uid)
+            )
+            user_districts = list(user_districts.scalars().all())
+
+            if not user_districts:
+                continue
+
+            # Распределяем бонус между районами пользователя
+            bonus_per_district = bonus // len(user_districts)
+            remaining_bonus = bonus % len(user_districts)
+
+            for i, district in enumerate(user_districts):
+                district_bonus = bonus_per_district
+                if i < remaining_bonus:  # Распределяем остаток
+                    district_bonus += 1
+                
+                if district_bonus > 0:
+                    district.control_points += district_bonus
+                    total_bonuses += district_bonus
+
+        if total_bonuses > 0:
+            await session.commit()
+            log.info(f"Начислено бонусов за защиту районов: {total_bonuses} ОК")
+
+            # Уведомления
+            if bot:
+                for uid, items in per_owner_breakdown.items():
+                    if not items:
+                        continue
+
+                    uq = await session.execute(select(User).where(User.id == uid))
+                    user = uq.scalars().first()
+                    if not user:
+                        continue
+
+                    total_bonus = sum(bonus for _, bonus in items)
+                    lines = []
+                    for district_name, bonus in items:
+                        lines.append(f"• <b>{district_name}</b>: +{bonus} ОК")
+
+                    body = "Вам начислены бонусы за защиту районов:\n" + "\n".join(lines)
+                    body += f"\n\nИтого: +<b>{total_bonus}</b> ОК"
+
+                    await notify_user(
+                        bot,
+                        user.tg_id,
+                        title="🛡️ Бонусы за защиту районов",
+                        body=body,
+                    )
+
+
+# ===========================
 #    GRANT RESOURCES
 # ===========================
 async def grant_district_resources(session: AsyncSession, contested: List[int]):
@@ -1015,10 +1189,13 @@ async def run_game_cycle():
             with StepTimer("Шаг 4.5: Базовые ресурсы игрокам"):
                 await grant_users_base_resources(session)
 
-            with StepTimer("Шаг 5: Выдача ресурсов"):
+            with StepTimer("Шаг 5: Бонусы за защиту районов"):
+                await grant_district_defense_bonuses(session, contested)
+
+            with StepTimer("Шаг 6: Выдача ресурсов"):
                 await grant_district_resources(session, contested)
 
-            with StepTimer("Шаг 6: Обновление слотов действий"):
+            with StepTimer("Шаг 7: Обновление слотов действий"):
                 await refresh_player_actions(session)
 
             log.info("=== Игровой цикл завершён ===")
