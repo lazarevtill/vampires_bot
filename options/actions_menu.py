@@ -16,14 +16,14 @@ async def actions_menu_back(cb: types.CallbackQuery):
 
 
 @option("actions_menu_defend")
-async def actions_menu_defend(cb: types.CallbackQuery):
-    await DistrictActionList().run(message=cb.message, action="defend")
+async def actions_menu_defend(cb: types.CallbackQuery, state: FSMContext):
+    await DistrictActionList().run(message=cb.message, actor=cb.from_user, state=state, action="defend")
     await cb.answer()
 
 
 @option("actions_menu_attack")
-async def actions_menu_attack(cb: types.CallbackQuery):
-    await DistrictActionList().run(message=cb.message, action="attack")
+async def actions_menu_attack(cb: types.CallbackQuery, state: FSMContext):
+    await DistrictActionList().run(message=cb.message, actor=cb.from_user, state=state, action="attack")
     await cb.answer()
 
 

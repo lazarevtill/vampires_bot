@@ -189,11 +189,66 @@ async def _bump_resource(cb: types.CallbackQuery, state: FSMContext, action_id: 
             return
 
         setattr(action, field, new_val)
+        
+        # Применяем бонусы от политиков района
+        await _apply_politician_bonuses(session, action)
+        
         await session.commit()
 
     await _rerender(cb, state, action_id)
     sign = "➕" if delta > 0 else "➖"
     await cb.answer(f"{sign} {field}: {current} → {new_val}")
+
+
+async def _apply_politician_bonuses(session, action):
+    """Применяет бонусы от политиков района к действию."""
+    if not action.district_id:
+        return
+    
+    # Получаем политика района
+    from db.models import Politician
+    from utils.bonus_system import BonusCalculator, BonusType
+    
+    pol_res = await session.execute(
+        select(Politician).where(Politician.district_id == action.district_id)
+    )
+    politician = pol_res.scalars().first()
+    
+    if not politician or not politician.bonuses_penalties:
+        return
+    
+    # Получаем название района
+    from db.models import District
+    district_res = await session.execute(
+        select(District).where(District.id == action.district_id)
+    )
+    district = district_res.scalars().first()
+    district_name = district.name if district else None
+    
+    # Вычисляем бонусы для действия
+    bonuses = BonusCalculator.calculate_action_bonuses(
+        action_kind=action.kind,
+        district_id=action.district_id,
+        district_name=district_name,
+        politician=politician,
+        action_type=action.type.value
+    )
+    
+    # Применяем бонусы к ресурсам действия
+    for bonus_type, bonus_value in bonuses.items():
+        if bonus_value == 0:
+            continue
+            
+        if bonus_type == BonusType.FORCE:
+            action.force = max(0, action.force + bonus_value)
+        elif bonus_type == BonusType.MONEY:
+            action.money = max(0, action.money + bonus_value)
+        elif bonus_type == BonusType.INFLUENCE:
+            action.influence = max(0, action.influence + bonus_value)
+        elif bonus_type == BonusType.INFORMATION:
+            action.information = max(0, action.information + bonus_value)
+        
+        logging.info(f"Применен бонус к действию {action.id}: +{bonus_value} {bonus_type.value}")
 
 
 @option("action_setup_menu_money_add")
