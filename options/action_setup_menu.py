@@ -260,6 +260,38 @@ async def action_setup_menu_force(cb: types.CallbackQuery, **_):
     await cb.answer()
 
 
+@option("action_setup_menu_ideology_conservative")
+async def action_setup_menu_ideology_conservative(cb: types.CallbackQuery, state: FSMContext, action_id: int, **_):
+    """Set ideology direction to conservative (-1)"""
+    async with get_session() as session:
+        action = (await session.execute(select(Action).where(Action.id == action_id))).scalars().first()
+        if not action:
+            await cb.answer("Действие не найдено.", show_alert=True)
+            return
+        
+        action.ideology_direction = -1
+        await session.commit()
+    
+    await _rerender(cb, state, action_id)
+    await cb.answer("🔽 Направление влияния: к консерватизму")
+
+
+@option("action_setup_menu_ideology_reforms")
+async def action_setup_menu_ideology_reforms(cb: types.CallbackQuery, state: FSMContext, action_id: int, **_):
+    """Set ideology direction to reforms (+1)"""
+    async with get_session() as session:
+        action = (await session.execute(select(Action).where(Action.id == action_id))).scalars().first()
+        if not action:
+            await cb.answer("Действие не найдено.", show_alert=True)
+            return
+        
+        action.ideology_direction = 1
+        await session.commit()
+    
+    await _rerender(cb, state, action_id)
+    await cb.answer("🔼 Направление влияния: к реформам")
+
+
 @option("action_setup_menu_back")
 async def action_setup_menu_back(cb: types.CallbackQuery, state: FSMContext, **kwargs):
     from screens.actions import ActionsScreen
@@ -332,7 +364,7 @@ async def action_setup_menu_done(cb: types.CallbackQuery, state, action_id: int,
             user.force       -= need_force
             user.available_actions = max(0, (user.available_actions or 0) - 1)
 
-            # переводим в PENDING
+            # переводим в PENDING (will be processed in next cycle)
             action.status = ActionStatus.PENDING
 
             # 🔹 если это разведка района — добавить район в список разведок пользователя

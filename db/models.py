@@ -498,6 +498,9 @@ class Action(Base):
     influence: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     information: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
+    # Ideology direction for influence: 1 for + (reforms), -1 for - (conservative), 0 for no direction
+    ideology_direction: Mapped[int] = mapped_column(Integer, default=0, nullable=False, server_default="0")
+
     estimated_power: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     on_point: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
@@ -527,7 +530,8 @@ class Action(Base):
             force: int = 0,
             money: int = 0,
             influence: int = 0,
-            information: int = 0
+            information: int = 0,
+            ideology_direction: int = 0
     ) -> "Action":
         obj = cls(
             owner_id=owner_id,
@@ -540,7 +544,8 @@ class Action(Base):
             force=force,
             money=money,
             influence=influence,
-            information=information
+            information=information,
+            ideology_direction=ideology_direction
         )
         session.add(obj)
         await session.commit()

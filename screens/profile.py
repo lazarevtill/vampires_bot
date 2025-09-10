@@ -1,6 +1,7 @@
 import logging
 from aiogram import types
 from sqlalchemy import select, func
+from sqlalchemy.orm import selectinload
 from db.session import get_session
 from db.models import User, District, now_utc
 from datetime import datetime, timezone, timedelta
@@ -52,9 +53,12 @@ class ProfileScreen(BaseScreen):
                     language_code=(actor or message.from_user).language_code,
                 )
 
-            districts_count = await session.scalar(
-                select(func.count(District.id)).where(District.owner_id == user.id)
-            ) or 0
+            # Load actual districts owned by user with their details
+            owned_districts = (await session.execute(
+                select(District).where(District.owner_id == user.id).order_by(District.name)
+            )).scalars().all()
+            
+            districts_count = len(owned_districts)
 
         # --- Статистика действий ---
         pending_count = sum(1 for a in user.actions if a.status == "pending")
@@ -66,6 +70,28 @@ class ProfileScreen(BaseScreen):
             f"({a.status})"
             for a in sorted(user.actions, key=lambda x: x.created_at, reverse=True)[:5]
         ]
+
+        # --- Calculate total district bonuses ---
+        total_district_bonuses = {
+            "money": sum(d.base_money or 0 for d in owned_districts),
+            "influence": sum(d.base_influence or 0 for d in owned_districts),
+            "information": sum(d.base_information or 0 for d in owned_districts),
+            "force": sum(d.base_force or 0 for d in owned_districts),
+        }
+
+        # --- Prepare district information ---
+        district_info = []
+        for district in owned_districts:
+            bonuses = []
+            if district.base_money: bonuses.append(f"+{district.base_money} 💰")
+            if district.base_influence: bonuses.append(f"+{district.base_influence} 🪙")
+            if district.base_information: bonuses.append(f"+{district.base_information} 🧠")
+            if district.base_force: bonuses.append(f"+{district.base_force} 💪")
+            
+            district_info.append({
+                "name": district.name,
+                "bonuses": ", ".join(bonuses) if bonuses else "нет бонусов"
+            })
 
         profile = {
             "name": user.in_game_name or user.username or str(user.tg_id),
@@ -88,6 +114,8 @@ class ProfileScreen(BaseScreen):
             "districts": {
                 "count": districts_count,
                 "has_any": districts_count > 0,
+                "list": district_info,
+                "total_bonuses": total_district_bonuses,
             },
             "actions_stats": {
                 "pending": pending_count,

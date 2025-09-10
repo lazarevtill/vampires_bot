@@ -649,6 +649,73 @@ async def close_all_scouting(session: AsyncSession):
 
 
 # ===========================
+#  IDEOLOGY CHANGES
+# ===========================
+async def apply_ideology_changes(session: AsyncSession):
+    """
+    Apply ideology changes from pending influence actions.
+    This processes all PENDING actions that have influence + ideology_direction.
+    """
+    with StepTimer("Применение изменений идеологии"):
+        # Get all pending actions with ideology direction
+        stmt = select(Action).where(
+            Action.status == ActionStatus.PENDING,
+            Action.influence > 0,
+            Action.ideology_direction != 0,
+            Action.district_id.is_not(None),
+            Action.kind.in_(["attack", "defend"])
+        )
+        res = await session.execute(stmt)
+        ideology_actions: List[Action] = list(res.scalars().all())
+        
+        if not ideology_actions:
+            log.info("Нет действий с изменением идеологии")
+            return
+        
+        log.info(f"Обработка {len(ideology_actions)} действий с изменением идеологии")
+        
+        # Group by district and accumulate ideology changes
+        ideology_effects: Dict[int, int] = defaultdict(int)
+        processed_action_ids: List[int] = []
+        
+        for action in ideology_actions:
+            if not action.district_id:
+                continue
+                
+            ideology_change = action.influence * action.ideology_direction
+            ideology_effects[action.district_id] += ideology_change
+            processed_action_ids.append(action.id)
+            
+            log.debug(f"Action {action.id}: +{ideology_change} ideology to district {action.district_id}")
+        
+        # Apply accumulated ideology changes to politicians
+        politicians_updated = 0
+        for district_id, total_change in ideology_effects.items():
+            if total_change == 0:
+                continue
+                
+            # Get politician for this district
+            pol_stmt = select(Politician).where(Politician.district_id == district_id)
+            pol_res = await session.execute(pol_stmt)
+            politician = pol_res.scalars().first()
+            
+            if politician:
+                old_ideology = politician.ideology
+                new_ideology = max(-5, min(5, politician.ideology + total_change))
+                
+                if new_ideology != old_ideology:
+                    politician.ideology = new_ideology
+                    politician.updated_at = now_utc()
+                    politicians_updated += 1
+                    
+                    log.info(f"Ideology change: {politician.name} {old_ideology} → {new_ideology} (change: {total_change})")
+        
+        # Don't mark actions as DONE here - they will be processed later by attack resolution
+        await session.commit()
+        log.info(f"Идеология обновлена у {politicians_updated} политиков, обработано {len(processed_action_ids)} действий")
+
+
+# ===========================
 #  IDEOLOGY MULTIPLIER
 # ===========================
 def ideology_multiplier(owner_ideol: int, pol_ideol: Optional[int]) -> float:
@@ -940,6 +1007,9 @@ async def run_game_cycle():
 
             with StepTimer("Шаг 1: Резерв обороны"):
                 defense_pool = await resolve_defense_pools(session, rates, contested)
+
+            with StepTimer("Шаг 1.5: Применение изменений идеологии"):
+                await apply_ideology_changes(session)
 
             with StepTimer("Шаг 2: Резолв атак"):
                 await resolve_attacks(session, rates, defense_pool, contested)
