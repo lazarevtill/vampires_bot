@@ -28,14 +28,29 @@ def run_migrations():
         alembic_cfg = Config("alembic.ini")
         alembic_cfg.set_main_option("sqlalchemy.url", db_config.url)
 
-        # Always create a fresh migration for PostgreSQL setup
+        # Always start fresh - clean up any existing migration files
         versions_dir = Path("alembic/versions")
-        
-        # Clean up any existing migration files to avoid conflicts
         if versions_dir.exists():
             for migration_file in versions_dir.glob("*.py"):
                 migration_file.unlink()
                 logger.info(f"Removed old migration: {migration_file}")
+        
+        # Drop alembic_version table to start completely fresh
+        try:
+            import asyncio
+            from sqlalchemy.ext.asyncio import create_async_engine
+            from sqlalchemy import text as sql_text
+            
+            async def drop_alembic_table():
+                engine = create_async_engine(db_config.url)
+                async with engine.begin() as conn:
+                    await conn.execute(sql_text("DROP TABLE IF EXISTS alembic_version"))
+                await engine.dispose()
+            
+            asyncio.run(drop_alembic_table())
+            logger.info("Dropped existing alembic_version table")
+        except Exception as e:
+            logger.info(f"Could not drop alembic_version table (may not exist): {e}")
         
         logger.info("Creating fresh initial migration...")
         # Create initial migration based on current models
@@ -45,6 +60,7 @@ def run_migrations():
         # Run all pending migrations
         logger.info("Running database migrations...")
         command.upgrade(alembic_cfg, "head")
+        
         logger.info("Database migrations completed successfully.")
 
     except Exception as e:

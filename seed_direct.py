@@ -40,17 +40,28 @@ async def clear_existing_data(session):
     """Clear existing data from all tables"""
     logger.info("Clearing existing data...")
     
-    # Clear in reverse dependency order (excluding users and actions)
-    tables = ['news', 'actions', 'politicians', 'user_scouts_districts', 'districts', 'users']
+    # Check if tables exist first
+    tables_to_clear = ['news', 'politicians', 'districts']
     
-    for table in tables:
+    for table in tables_to_clear:
         try:
-            await session.execute(text(f"DELETE FROM {table}"))
-            logger.info(f"Cleared table: {table}")
+            # Check if table exists
+            result = await session.execute(text(f"SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = '{table}')"))
+            table_exists = result.scalar()
+            
+            if table_exists:
+                await session.execute(text(f"DELETE FROM {table}"))
+                logger.info(f"Cleared table: {table}")
+            else:
+                logger.info(f"Table {table} does not exist yet, skipping clear")
         except Exception as e:
             logger.warning(f"Could not clear table {table}: {e}")
     
-    await session.commit()
+    try:
+        await session.commit()
+    except Exception as e:
+        logger.warning(f"Could not commit clear operation: {e}")
+        await session.rollback()
 
 async def migrate_users(session, sqlite_conn):
     """Migrate users from SQLite to PostgreSQL"""
@@ -108,6 +119,17 @@ async def migrate_users(session, sqlite_conn):
 
 async def migrate_districts(session, sqlite_conn):
     """Migrate districts from SQLite to PostgreSQL"""
+    # Check if districts table exists
+    try:
+        result = await session.execute(text("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'districts')"))
+        table_exists = result.scalar()
+        if not table_exists:
+            logger.error("Districts table does not exist! Make sure migrations ran successfully.")
+            return
+    except Exception as e:
+        logger.error(f"Could not check if districts table exists: {e}")
+        return
+    
     cursor = sqlite_conn.cursor()
     cursor.execute("SELECT * FROM districts")
     rows = cursor.fetchall()

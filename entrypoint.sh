@@ -16,12 +16,16 @@ echo "PostgreSQL is ready!"
 echo "Running database migrations..."
 python init_db.py
 
-# Seed database with actual data using direct migration
-echo "Seeding database with actual data using direct migration..."
-python seed_direct.py
+# Wait a moment for database to be fully ready
+echo "Waiting for database to be fully ready..."
+sleep 3
+
+# Seed database with sample data for development
+echo "Seeding database with sample data..."
+python seed_database.py
 
 # Alternative seeding options:
-# python seed_database.py      # Sample data for development
+# python seed_direct.py        # Direct migration from SQLite (if needed)
 # python seed_from_sql.py      # SQL dump method (if SQL dump exists)
 
 echo "Starting the bot application..."
