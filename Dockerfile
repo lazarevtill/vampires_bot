@@ -43,7 +43,7 @@ COPY --from=builder /usr/local /usr/local
 COPY . .
 
 # Make scripts executable
-RUN chmod +x init_db.py seed_database.py entrypoint.sh
+RUN chmod +x init_db.py seed_database.py seed_production.py seed_from_sql.py seed_direct.py extract_sql_dump.py entrypoint.sh
 
 # Create alembic versions directory if it doesn't exist
 RUN mkdir -p alembic/versions
