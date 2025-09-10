@@ -2,7 +2,8 @@ import logging
 from aiogram import types
 from sqlalchemy import select, func
 from db.session import get_session
-from db.models import User, District
+from db.models import User, District, now_utc
+from datetime import datetime, timezone, timedelta
 from keyboards.spec import KeyboardParams, KeyboardSpec
 from .base import BaseScreen
 from keyboards.presets import main_menu_kb
@@ -15,6 +16,25 @@ def ideology_bar(value: int, size: int = 11) -> str:
 
 
 class ProfileScreen(BaseScreen):
+    def _calculate_next_refresh_minutes(self, actions_refresh_at):
+        """Calculate minutes until next action refresh"""
+        if actions_refresh_at is None:
+            # If no refresh time set, assume next refresh is in 3 hours (game cycle length)
+            return 180
+        
+        now = now_utc()
+        
+        # If the last refresh was recent (within last 3 hours), calculate time until next 3-hour cycle
+        time_since_refresh = now - actions_refresh_at
+        if time_since_refresh < timedelta(hours=3):
+            # Next refresh is 3 hours after the last refresh
+            next_refresh = actions_refresh_at + timedelta(hours=3)
+            minutes_until_next = int((next_refresh - now).total_seconds() / 60)
+            return max(0, minutes_until_next)
+        else:
+            # If it's been more than 3 hours, actions should be refreshed already
+            return 0
+
     async def _pre_render(self, message: types.Message, actor: types.User | None = None, **kwargs):
         tg_id = actor.id if actor else (message.from_user.id if message else None)
         logging.info("StatusScreen for tg_id=%s", tg_id)
@@ -62,7 +82,7 @@ class ProfileScreen(BaseScreen):
             "applications": {
                 "available": user.available_actions,
                 "max_available": user.max_available_actions,
-                "next_update_minutes": user.actions_refresh_at,
+                "next_update_minutes": self._calculate_next_refresh_minutes(user.actions_refresh_at),
                 "fast_actions": kwargs.get("fast_actions_left", 3),
             },
             "districts": {

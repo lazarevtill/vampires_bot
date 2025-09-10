@@ -19,27 +19,27 @@ from sqlalchemy import text
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Sample data for seeding
-SAMPLE_DISTRICTS = [
-    {"name": "Central District", "base_money": 150, "base_influence": 20, "base_information": 10, "base_force": 5},
-    {"name": "Industrial Quarter", "base_money": 200, "base_influence": 15, "base_information": 8, "base_force": 12},
-    {"name": "Old Town", "base_money": 120, "base_influence": 25, "base_information": 15, "base_force": 3},
-    {"name": "Harbor District", "base_money": 180, "base_influence": 18, "base_information": 12, "base_force": 8},
-    {"name": "University Quarter", "base_money": 100, "base_influence": 30, "base_information": 25, "base_force": 2},
-    {"name": "Financial District", "base_money": 250, "base_influence": 22, "base_information": 18, "base_force": 6},
-    {"name": "Residential Area", "base_money": 130, "base_influence": 12, "base_information": 8, "base_force": 4},
-    {"name": "Entertainment District", "base_money": 160, "base_influence": 28, "base_information": 20, "base_force": 7}
+# Real game data from Змейс Макрокарта Версия.md
+GAME_DISTRICTS = [
+    {"name": "Стари-Град", "base_money": 0, "base_influence": 2, "base_information": 1, "base_force": 0},
+    {"name": "Лиман", "base_money": 0, "base_influence": 1, "base_information": 2, "base_force": 0},
+    {"name": "Подбара", "base_money": 2, "base_influence": 0, "base_information": 0, "base_force": 1},
+    {"name": "Ротквария", "base_money": 3, "base_influence": 1, "base_information": 0, "base_force": 0},
+    {"name": "Петроварадин", "base_money": 0, "base_influence": 1, "base_information": 0, "base_force": 3},
+    {"name": "Саймиште", "base_money": 2, "base_influence": 0, "base_information": 0, "base_force": 1},
+    {"name": "Грбавица", "base_money": 0, "base_influence": 1, "base_information": 2, "base_force": 0},
+    {"name": "Адамовичево", "base_money": 0, "base_influence": 2, "base_information": 1, "base_force": 0}
 ]
 
-SAMPLE_POLITICIANS = [
-    {"name": "Mayor Victoria Sterling", "role": "City Mayor - Controls municipal policies and has significant influence over all districts", "ideology": 2, "influence": 50},
-    {"name": "Councilman Marcus Webb", "role": "District Council Leader - Manages local governance and resource allocation", "ideology": -1, "influence": 35},
-    {"name": "Senator Elena Rodriguez", "role": "State Senator - Influences regional politics and funding", "ideology": 3, "influence": 45},
-    {"name": "Judge Harrison Clarke", "role": "District Court Judge - Controls legal proceedings and justice system", "ideology": 0, "influence": 40},
-    {"name": "Commissioner Sarah Chen", "role": "Police Commissioner - Oversees law enforcement and security", "ideology": -2, "influence": 38},
-    {"name": "Director James Morrison", "role": "Economic Development Director - Manages business licenses and development", "ideology": 1, "influence": 32},
-    {"name": "Professor Angela Thompson", "role": "University Chancellor - Controls education and research funding", "ideology": 2, "influence": 28},
-    {"name": "Captain Robert Hayes", "role": "Harbor Master - Controls shipping and trade regulations", "ideology": -1, "influence": 25}
+GAME_POLITICIANS = [
+    {"name": "Слободан Милошевич", "role": "Глава государства, контроль над госаппаратом", "district_id": 1, "ideology": -5, "influence": 6, "bonuses": "+5 ОК за каждую заявку Атака/Защита (конечно же все на поддержку режима)"},
+    {"name": "Зоран Джинджич", "role": "Оппозиционный лидер, экономические реформы", "district_id": 2, "ideology": 5, "influence": 7, "bonuses": "+5 ОК в районах с +3 и больше"},
+    {"name": "Желько «Аркан» Ражнатович", "role": "Теневая экономика, чёрный рынок", "district_id": 3, "ideology": -2, "influence": 5, "bonuses": "+3 Силы при Защите Подбары, -3 Силы при атаке на Подбару"},
+    {"name": "Борислав Милошевич", "role": "Влияние НАТО и ЕС", "district_id": 4, "ideology": 3, "influence": 4, "bonuses": "Способны вводить санкции, бонус к защите районов (решается через переписку с МГ)"},
+    {"name": "Небойша Павкович", "role": "Контроль над армией, силовые структуры", "district_id": 5, "ideology": -4, "influence": 6, "bonuses": "+5 ОК при заявках на Защиту в любых районах"},
+    {"name": "Миролюб Лабус", "role": "Влияние среди рабочих, забастовки", "district_id": 6, "ideology": 2, "influence": 4, "bonuses": "+3 Денег при Кооперативных заявках, -3 Денег при любых Атаках"},
+    {"name": "Чедомир «Чеда» Йованович", "role": "Молодёжные протесты, уличные акции", "district_id": 7, "ideology": 4, "influence": 5, "bonuses": "+5 ОК при массовых акциях, штраф к силовому контролю"},
+    {"name": "Патриарх Павле", "role": "Церковь, влияние на традиционалистов", "district_id": 8, "ideology": -1, "influence": 5, "bonuses": "+5 Влияния в цикл"}
 ]
 
 SAMPLE_NEWS_ITEMS = [
@@ -153,63 +153,66 @@ async def seed_sample_users(session):
     logger.info(f"Created {len(sample_users)} sample users")
     return sample_users
 
-async def seed_sample_districts(session, users):
-    """Create sample districts"""
-    logger.info("Creating sample districts...")
+async def seed_game_districts(session):
+    """Create game districts with no owners (neutral)"""
+    logger.info("Creating game districts...")
     
     districts = []
     
-    for i, district_data in enumerate(SAMPLE_DISTRICTS):
-        # Assign districts to random users (excluding admin)
-        owner = random.choice(users[1:])  # Skip admin user
-        
-        control_levels = list(ControlLevel)
-        control_level = random.choice(control_levels)
-        
+    for district_data in GAME_DISTRICTS:
         district = District(
             name=district_data["name"],
-            owner_id=owner.id,
-            control_points=random.randint(0, 100),
-            control_level=control_level,
-            resource_multiplier=random.uniform(0.3, 0.8),
+            owner_id=None,  # All districts start neutral
+            control_points=0,  # Start with no control points
+            control_level=ControlLevel.MINIMAL,  # All start at minimal level
+            resource_multiplier=1.0,  # Standard multiplier
             base_money=district_data["base_money"],
             base_influence=district_data["base_influence"],
             base_information=district_data["base_information"],
             base_force=district_data["base_force"],
-            created_at=datetime.utcnow() - timedelta(days=random.randint(1, 20))
+            created_at=datetime.utcnow()
         )
         session.add(district)
         districts.append(district)
     
     await session.commit()
-    logger.info(f"Created {len(districts)} sample districts")
+    logger.info(f"Created {len(districts)} game districts")
     return districts
 
-async def seed_sample_politicians(session, districts):
-    """Create sample politicians"""
-    logger.info("Creating sample politicians...")
+async def seed_game_politicians(session, districts):
+    """Create game politicians"""
+    logger.info("Creating game politicians...")
+    logger.info(f"Received {len(districts)} districts to work with")
+    
+    # Debug: print district IDs
+    for i, district in enumerate(districts):
+        logger.info(f"District {i+1}: {district.name} (ID: {district.id})")
     
     politicians = []
     
-    for i, politician_data in enumerate(SAMPLE_POLITICIANS):
-        # Some politicians are assigned to specific districts, others are city-wide
-        district = random.choice(districts) if i > 2 else None  # First 3 are city-wide
+    for politician_data in GAME_POLITICIANS:
+        # Get the actual district ID from the created districts list
+        # politician_data["district_id"] is 1-based, but we need the actual DB ID
+        district_index = politician_data["district_id"] - 1  # Convert to 0-based index
+        actual_district = districts[district_index]
+        
+        logger.info(f"Creating politician {politician_data['name']} for district {actual_district.name} (ID: {actual_district.id})")
         
         politician = Politician(
             name=politician_data["name"],
             role_and_influence=politician_data["role"],
-            district_id=district.id if district else None,
+            district_id=actual_district.id,  # Use the actual district ID from DB
             ideology=politician_data["ideology"],
             influence=politician_data["influence"],
-            bonuses_penalties=f"Provides {politician_data['influence']} influence points when aligned",
-            created_at=datetime.utcnow() - timedelta(days=random.randint(1, 15)),
+            bonuses_penalties=politician_data["bonuses"],
+            created_at=datetime.utcnow(),
             updated_at=datetime.utcnow()
         )
         session.add(politician)
         politicians.append(politician)
     
     await session.commit()
-    logger.info(f"Created {len(politicians)} sample politicians")
+    logger.info(f"Created {len(politicians)} game politicians")
     return politicians
 
 async def seed_sample_actions(session, users, districts):
@@ -321,33 +324,40 @@ async def seed_scout_relationships(session, users, districts):
 
 async def main():
     """Main seeding function"""
-    logger.info("Starting database seeding with sample data...")
+    logger.info("Starting database seeding with real game data...")
     
     async with get_session() as session:
         try:
             # Clear existing data
             await clear_existing_data(session)
             
-            # Create sample data in dependency order
-            users = await seed_sample_users(session)
-            districts = await seed_sample_districts(session, users)
-            politicians = await seed_sample_politicians(session, districts)
-            actions = await seed_sample_actions(session, users, districts)
-            news_items = await seed_sample_news(session, actions)
-            await seed_scout_relationships(session, users, districts)
+            # Create real game data (no users or actions as requested)
+            districts = await seed_game_districts(session)
+            politicians = await seed_game_politicians(session, districts)
+            
+            # Create some basic news
+            news_items = []
+            news = News(
+                title="Загадочное ограбление в Старом Граде",
+                body="Нови-Сад — Сегодня ранним утром полиция оцепила район Старого Града после того, как поступило сообщение о необычном ограблении, произошедшем минувшей ночью. По предварительной информации, объектом нападения стал не банк или ювелирный магазин, а частная коллекция, находившаяся в старинном доме на одной из узких улочек.\n\nПреступники действовали бесшумно и, по словам свидетелей, не оставили никаких следов взлома. Из дома была похищена не денежная сумма и не драгоценности, а несколько загадочных артефактов, имеющих, по словам владельца, не столько материальную, сколько историческую и оккультную ценность. Среди похищенного упоминаются «Ключ Безмолвия» и «Зеркало Эхо». Эксперты затрудняются оценить стоимость украденного, поскольку подобные предметы никогда не фигурировали на чёрном рынке.\n\nСледствие рассматривает произошедшее как тщательно спланированную операцию. Местная пресса уже окрестила преступление «Ограблением-призраком», подчёркивая его таинственность. Полиция призывает жителей сохранять спокойствие и сообщать любую информацию, которая может помочь в расследовании.",
+                media_urls=[],
+                action_id=None,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow()
+            )
+            session.add(news)
+            news_items.append(news)
+            await session.commit()
             
             logger.info("Database seeding completed successfully!")
-            logger.info("Sample data created:")
-            logger.info(f"  - {len(users)} users (including 1 admin)")
-            logger.info(f"  - {len(districts)} districts")
+            logger.info("Real game data created:")
+            logger.info(f"  - {len(districts)} districts (all neutral)")
             logger.info(f"  - {len(politicians)} politicians")
-            logger.info(f"  - {len(actions)} actions")
             logger.info(f"  - {len(news_items)} news items")
             logger.info("")
-            logger.info("Admin credentials for testing:")
-            logger.info("  Telegram ID: 999999999")
-            logger.info("  Username: admin_vampire")
-            logger.info("  In-game name: The Elder")
+            logger.info("Districts created:")
+            for d in districts:
+                logger.info(f"  - {d.name}: +{d.base_money} Денег, +{d.base_influence} Влияния, +{d.base_information} Информации, +{d.base_force} Силы")
             
         except Exception as e:
             logger.error(f"Error during seeding: {e}")

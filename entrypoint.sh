@@ -21,7 +21,7 @@ echo "Waiting for database to be fully ready..."
 sleep 3
 
 # Seed database with sample data for development
-echo "Seeding database with sample data..."
+echo "Seeding database with game data..."
 python seed_database.py
 
 # Alternative seeding options:
