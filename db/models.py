@@ -429,6 +429,8 @@ class ActionType(PyEnum):
     SCOUT_DISTRICT = "scout_dist"
     SCOUT_INFO = "scout_info"
 
+    RITUAL = "ritual"
+
 
 class ActionStatus(PyEnum):
     DRAFT = "draft"
@@ -497,12 +499,14 @@ class Action(Base):
     money: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     influence: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     information: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    candles: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     # Ideology direction for influence: 1 for + (reforms), -1 for - (conservative), 0 for no direction
     ideology_direction: Mapped[int] = mapped_column(Integer, default=0, nullable=False, server_default="0")
 
     estimated_power: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     on_point: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    won_on_point: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(

@@ -17,7 +17,7 @@ def actions_menu_kb() -> KeyboardSpec:
     return KeyboardSpec(
         type="inline",
         name="actions_menu",
-        options=["defend", "attack", "scout", "communicate", ["actions_list"], ["back"]],
+        options=["defend", "attack", "scout", "communicate", "ritual", ["actions_list"], ["back"]],
         params=KeyboardParams(max_in_row=2)
     )
 

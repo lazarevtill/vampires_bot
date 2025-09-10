@@ -419,6 +419,19 @@ class SettingsActionScreen(BaseScreen):
                 is_list=is_list,
             )
 
+        elif kind == "ritual":
+            action_ctx["ui"]["show_type_switch"] = False
+            action_ctx["ui"]["show_district"] = False
+            action_ctx["ui"]["resources_editable"] = True
+
+            resources_for_kb = ["candles"]
+            keyboard = action_setup_kb(
+                resources_for_kb,
+                action_ctx["id"],
+                action_ctx["status"],
+                is_list=is_list,
+            )
+
         else:
             # запасной вариант — как defend
             keyboard = action_setup_kb(

@@ -55,6 +55,7 @@ COMBAT_RATES_PATH = os.getenv("COMBAT_RATES_PATH", "./config/combat_rates.json")
 ATTACK_KIND = "attack"
 DEFENSE_KIND = "defense"
 SCOUT_KINDS = {"scout_dist", "scout_info"}
+RITUAL_KINDS = {"ritual"}
 
 ORDER_ATTACKS_ASC = True  # порядок атак по created_at
 
@@ -649,6 +650,80 @@ async def close_all_scouting(session: AsyncSession):
 
 
 # ===========================
+#     CLOSE ALL RITUALS
+# ===========================
+async def close_all_rituals(session: AsyncSession):
+    """
+    Закрывает все pending-ритуалы и уведомляет участников о завершении.
+    """
+    with StepTimer("Закрытие ритуалов"):
+        # Бот для уведомлений (если есть)
+        try:
+            from app import bot  # type: ignore
+        except Exception:
+            bot = None
+            log.warning("Бот недоступен: уведомления о завершении ритуалов отправляться не будут.")
+
+        # Закрываем все PENDING ritual-экшены
+        stmt = select(Action).where(
+            Action.status == ActionStatus.PENDING,
+            Action.kind.in_(RITUAL_KINDS),
+        )
+        res = await session.execute(stmt)
+        ritual_actions: List[Action] = list(res.scalars().all())
+        
+        if not ritual_actions:
+            log.info("Нет активных ритуалов для закрытия")
+            return
+            
+        # Получаем информацию об участниках ритуалов
+        ritual_participants = {}
+        for action in ritual_actions:
+            user_id = action.owner_id
+            if user_id not in ritual_participants:
+                ritual_participants[user_id] = []
+            ritual_participants[user_id].append({
+                'candles': getattr(action, 'candles', 0) or 0,
+                'location': action.text[:100] if action.text else 'Не указано',
+                'action_id': action.id
+            })
+
+        # Закрываем все ритуальные действия
+        ritual_ids = [action.id for action in ritual_actions]
+        if ritual_ids:
+            await session.execute(
+                update(Action).where(Action.id.in_(ritual_ids)).values(status=ActionStatus.DONE, updated_at=now_utc())
+            )
+            log.info("Закрыто ритуальных экшенов: %d", len(ritual_ids))
+
+        await session.commit()
+
+        # Уведомляем участников ритуалов
+        if bot and ritual_participants:
+            user_cache = {}
+            for user_id, rituals in ritual_participants.items():
+                if user_id not in user_cache:
+                    user = await session.get(User, user_id)
+                    if user:
+                        user_cache[user_id] = user
+
+                if user_id in user_cache:
+                    user = user_cache[user_id]
+                    ritual_details = []
+                    for ritual in rituals:
+                        ritual_details.append(
+                            f"🕯️ {ritual['candles']} свечей - {ritual['location']}"
+                        )
+                    
+                    body = (
+                        "Ваши ритуальные действия завершены.\n\n"
+                        "Проведённые ритуалы:\n" + "\n".join(ritual_details) +
+                        "\n\nРезультаты ритуалов могут повлиять на дальнейшие события в игре."
+                    )
+                    await notify_user(bot, user.tg_id, title="🕯️ Ритуалы завершены", body=body)
+
+
+# ===========================
 #  IDEOLOGY CHANGES
 # ===========================
 async def apply_ideology_changes(session: AsyncSession):
@@ -1019,6 +1094,9 @@ async def run_game_cycle():
 
             with StepTimer("Шаг 3: Закрыть все разведки"):
                 await close_all_scouting(session)
+
+            with StepTimer("Шаг 3.5: Закрыть все ритуалы"):
+                await close_all_rituals(session)
 
             with StepTimer("Шаг 4: Пересчёт ресурсных множителей"):
                 await recalc_resource_multipliers(session)
