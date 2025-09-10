@@ -63,9 +63,18 @@ SAMPLE_FACTIONS = [
 ]
 
 ACTION_TYPES_SAMPLE = [
-    "infiltrate", "negotiate", "sabotage", "gather_intel", 
-    "establish_presence", "form_alliance", "eliminate_threat"
+    "attack", "defend", "scout", "communicate"
 ]
+
+def get_action_description(kind):
+    """Get action description based on game rules"""
+    descriptions = {
+        "attack": "Захват района (нейтрального или принадлежащего другому игроку). Использует Силу и Деньги, иногда Влияние для изменения позиции политика.",
+        "defend": "Оборона района от атак других игроков. Использует Силу и Деньги, иногда Влияние для изменения позиции политика.",
+        "scout": "Получение информации о том, кто и какими силами атакует район, кто проводит в нем ритуалы и движущихся по нему курьеров. Использует Информацию.",
+        "communicate": "Распространение слухов через политические/общественные каналы. Использует Влияние."
+    }
+    return descriptions.get(kind, "Неизвестное действие")
 
 async def clear_existing_data(session):
     """Clear existing data from all tables"""
@@ -237,21 +246,58 @@ async def seed_sample_actions(session, users, districts):
             parent_action = random.choice(actions[:i])
             action_type = ActionType.SUPPORT
         
+        # Set resources based on action type according to game rules
+        force = 0
+        money = 0
+        influence = 0
+        information = 0
+        
+        if kind == "attack":
+            # Attack uses Force and Money primarily, sometimes Influence
+            force = random.randint(1, 4)
+            money = random.randint(1, 3)
+            if random.random() < 0.3:  # 30% chance to use influence
+                influence = random.randint(1, 2)
+        elif kind == "defend":
+            # Defend uses Force and Money primarily, sometimes Influence  
+            force = random.randint(1, 4)
+            money = random.randint(1, 3)
+            if random.random() < 0.3:  # 30% chance to use influence
+                influence = random.randint(1, 2)
+        elif kind == "scout":
+            # Scout uses Information primarily
+            information = random.randint(1, 3)
+        elif kind == "communicate":
+            # Communicate uses Influence primarily
+            influence = random.randint(1, 3)
+        
+        # Calculate estimated power based on resources used (from game rules)
+        estimated_power = (force * 10) + (money * 5) + influence + information
+        
+        # Get Russian action names
+        action_names = {
+            "attack": "Атака",
+            "defend": "Защита", 
+            "scout": "Разведка",
+            "communicate": "Коммуникация"
+        }
+        action_name = action_names.get(kind, kind.title())
+        
         action = Action(
             kind=kind,
-            title=f"{kind.replace('_', ' ').title()} in {district.name if district else 'City'}" if district else f"City-wide {kind.replace('_', ' ').title()}",
+            title=f"{action_name} в районе {district.name}" if district else f"Общегородская {action_name}",
             status=status,
             owner_id=owner.id,
             district_id=district.id if district else None,
             type=action_type,
             parent_action_id=parent_action.id if parent_action else None,
-            force=random.randint(0, 50),
-            money=random.randint(0, 100),
-            influence=random.randint(0, 80),
-            information=random.randint(0, 60),
-            estimated_power=random.randint(10, 200),
+            force=force,
+            money=money,
+            influence=influence,
+            information=information,
+            estimated_power=estimated_power,
             on_point=random.random() > 0.7,  # 30% chance
-            text=f"Sample action description for {kind}. This is a test action created during database seeding.",
+            text=f"Action description for {kind}. {get_action_description(kind)}",
             created_at=datetime.utcnow() - timedelta(hours=random.randint(1, 168)),  # Last week
             updated_at=datetime.utcnow()
         )
@@ -331,9 +377,11 @@ async def main():
             # Clear existing data
             await clear_existing_data(session)
             
-            # Create real game data (no users or actions as requested)
+            # Create real game data 
             districts = await seed_game_districts(session)
             politicians = await seed_game_politicians(session, districts)
+            
+            # No sample users or actions - only real game data
             
             # Create some basic news
             news_items = []
@@ -354,6 +402,7 @@ async def main():
             logger.info(f"  - {len(districts)} districts (all neutral)")
             logger.info(f"  - {len(politicians)} politicians")
             logger.info(f"  - {len(news_items)} news items")
+            logger.info("  - No sample users or actions (only real players will be created when they join)")
             logger.info("")
             logger.info("Districts created:")
             for d in districts:

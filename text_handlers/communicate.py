@@ -42,7 +42,7 @@ async def handle_communicate_news(message: Message, state: FSMContext):
                 district_id=None,
                 type=ActionType.INDIVIDUAL,
                 status=ActionStatus.DRAFT,
-                force=0, money=0, influence=0, information=0,
+                force=0, money=0, influence=0, information=1,  # default 1 information for communicate
             )
             # обновим текст (если нет .text в create)
             await session.refresh(action)

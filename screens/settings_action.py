@@ -419,6 +419,12 @@ class SettingsActionScreen(BaseScreen):
 
         return {
             "action": action_ctx,
+            "user": {
+                "information": user.information,
+                "influence": user.influence,
+                "money": user.money,
+                "force": user.force,
+            },
             "keyboard": keyboard,
             "list_info": list_info,
         }

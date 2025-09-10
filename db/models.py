@@ -69,7 +69,7 @@ class User(Base):
     # НОВОЕ
     ideology: Mapped[int] = mapped_column(Integer, default=0, nullable=False)  # -5..+5
     faction: Mapped[Optional[str]] = mapped_column(String(64))  # простой текст
-    available_actions: Mapped[int] = mapped_column(Integer, default=0, nullable=False)  # сколько слотов
+    available_actions: Mapped[int] = mapped_column(Integer, default=5, nullable=False)  # сколько слотов
     max_available_actions: Mapped[int] = mapped_column(Integer, default=5, nullable=True)  # сколько слотов
     actions_refresh_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
@@ -134,7 +134,7 @@ class User(Base):
             base_influence=extra.get('base_influence', 2),
             base_information=extra.get('base_information', 2),
             base_force=extra.get('base_force', 1),
-            available_actions=extra.get('available_actions', 0),
+            available_actions=extra.get('available_actions', 5),
             max_available_actions=extra.get('max_available_actions', 5),
             actions_refresh_at=extra.get('actions_refresh_at', now_utc()),
             **{k: v for k, v in extra.items() if k not in [
@@ -144,9 +144,26 @@ class User(Base):
             ]},
         )
         session.add(user)
+        # Ensure action slots are properly initialized
+        user.ensure_action_slots_initialized()
+        
         await session.commit()
         await session.refresh(user)
         return user
+    
+    def ensure_action_slots_initialized(self):
+        """Ensure user has proper action slots initialized"""
+        # Fix max_available_actions if not set
+        if self.max_available_actions is None or self.max_available_actions <= 0:
+            self.max_available_actions = 5
+        
+        # Fix available_actions if not set or less than expected for new user
+        if self.available_actions is None or self.available_actions <= 0:
+            self.available_actions = self.max_available_actions
+        
+        # Set actions_refresh_at if not set
+        if self.actions_refresh_at is None:
+            self.actions_refresh_at = now_utc()
 
     @classmethod
     async def get_by_tg_id(cls, session, tg_id: int) -> Optional["User"]:

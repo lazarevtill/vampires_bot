@@ -206,6 +206,12 @@ async def action_setup_menu_money_remove(cb: types.CallbackQuery, state: FSMCont
     await _bump_resource(cb, state, action_id, "money", -_STEP)
 
 
+@option("action_setup_menu_money")
+async def action_setup_menu_money(cb: types.CallbackQuery, **_):
+    # Middle button - just refresh the screen, no change
+    await cb.answer()
+
+
 @option("action_setup_menu_influence_add")
 async def action_setup_menu_influence_add(cb: types.CallbackQuery, state: FSMContext, action_id: int, **_):
     await _bump_resource(cb, state, action_id, "influence", +_STEP)
@@ -214,6 +220,12 @@ async def action_setup_menu_influence_add(cb: types.CallbackQuery, state: FSMCon
 @option("action_setup_menu_influence_remove")
 async def action_setup_menu_influence_remove(cb: types.CallbackQuery, state: FSMContext, action_id: int, **_):
     await _bump_resource(cb, state, action_id, "influence", -_STEP)
+
+
+@option("action_setup_menu_influence")
+async def action_setup_menu_influence(cb: types.CallbackQuery, **_):
+    # Middle button - just refresh the screen, no change
+    await cb.answer()
 
 
 @option("action_setup_menu_information_add")
@@ -226,6 +238,12 @@ async def action_setup_menu_information_remove(cb: types.CallbackQuery, state: F
     await _bump_resource(cb, state, action_id, "information", -_STEP)
 
 
+@option("action_setup_menu_information")
+async def action_setup_menu_information(cb: types.CallbackQuery, **_):
+    # Middle button - just refresh the screen, no change
+    await cb.answer()
+
+
 @option("action_setup_menu_force_add")
 async def action_setup_menu_force_add(cb: types.CallbackQuery, state: FSMContext, action_id: int, **_):
     await _bump_resource(cb, state, action_id, "force", +_STEP)
@@ -234,6 +252,12 @@ async def action_setup_menu_force_add(cb: types.CallbackQuery, state: FSMContext
 @option("action_setup_menu_force_remove")
 async def action_setup_menu_force_remove(cb: types.CallbackQuery, state: FSMContext, action_id: int, **_):
     await _bump_resource(cb, state, action_id, "force", -_STEP)
+
+
+@option("action_setup_menu_force")
+async def action_setup_menu_force(cb: types.CallbackQuery, **_):
+    # Middle button - just refresh the screen, no change
+    await cb.answer()
 
 
 @option("action_setup_menu_back")

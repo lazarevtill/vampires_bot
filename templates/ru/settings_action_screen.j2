@@ -27,6 +27,7 @@
 {% set r = action.resources or {} %}
 {% if is_scout %}<b>🔧 Стоимость:</b> {{ res_row("🧠","информация",r.information|default(1)) }}
 {% elif resources_only_info %}<b>🔧 Ресурсы:</b> {{ res_row("🧠","информация",r.information) }}
+<b>📊 Доступно:</b> информация: {{ user.information|default(0) }}
 {% elif show_resources_all %}{% if nonzero(r) %}<b>🔧 Ресурсы:</b>
 {{ res_row("💪","сила",r.force) }}
 {{ res_row("💰","деньги",r.money) }}
