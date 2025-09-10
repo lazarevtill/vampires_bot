@@ -650,77 +650,74 @@ async def close_all_scouting(session: AsyncSession):
 
 
 # ===========================
-#     CLOSE ALL RITUALS
+#     PROCESS EXPIRED RITUALS
 # ===========================
-async def close_all_rituals(session: AsyncSession):
+async def process_expired_rituals(session: AsyncSession):
     """
-    Закрывает все pending-ритуалы и уведомляет участников о завершении.
+    Проверяет и закрывает ритуалы, время которых истекло.
+    Эта функция должна вызываться периодически (например, каждые 5 минут).
     """
-    with StepTimer("Закрытие ритуалов"):
-        # Бот для уведомлений (если есть)
-        try:
-            from app import bot  # type: ignore
-        except Exception:
-            bot = None
-            log.warning("Бот недоступен: уведомления о завершении ритуалов отправляться не будут.")
-
-        # Закрываем все PENDING ritual-экшены
-        stmt = select(Action).where(
-            Action.status == ActionStatus.PENDING,
-            Action.kind.in_(RITUAL_KINDS),
+    from datetime import datetime, timezone
+    
+    current_time = datetime.now(timezone.utc)
+    
+    # Найти все активные ритуалы с истёкшим временем
+    stmt = select(Action).where(
+        Action.status == ActionStatus.PENDING,
+        Action.kind.in_(RITUAL_KINDS),
+        Action.ritual_end_time.is_not(None),
+        Action.ritual_end_time <= current_time
+    )
+    res = await session.execute(stmt)
+    expired_rituals: List[Action] = list(res.scalars().all())
+    
+    if not expired_rituals:
+        return
+    
+    log.info(f"Обнаружено {len(expired_rituals)} завершённых ритуалов")
+    
+    # Бот для уведомлений (если есть)
+    try:
+        from app import bot  # type: ignore
+    except Exception:
+        bot = None
+        log.warning("Бот недоступен: уведомления о завершении ритуалов отправляться не будут.")
+    
+    # Закрываем завершённые ритуалы
+    ritual_ids = [action.id for action in expired_rituals]
+    await session.execute(
+        update(Action).where(Action.id.in_(ritual_ids)).values(
+            status=ActionStatus.DONE, 
+            updated_at=current_time
         )
-        res = await session.execute(stmt)
-        ritual_actions: List[Action] = list(res.scalars().all())
-        
-        if not ritual_actions:
-            log.info("Нет активных ритуалов для закрытия")
-            return
-            
-        # Получаем информацию об участниках ритуалов
-        ritual_participants = {}
-        for action in ritual_actions:
-            user_id = action.owner_id
-            if user_id not in ritual_participants:
-                ritual_participants[user_id] = []
-            ritual_participants[user_id].append({
-                'candles': getattr(action, 'candles', 0) or 0,
-                'location': action.text[:100] if action.text else 'Не указано',
-                'action_id': action.id
-            })
-
-        # Закрываем все ритуальные действия
-        ritual_ids = [action.id for action in ritual_actions]
-        if ritual_ids:
-            await session.execute(
-                update(Action).where(Action.id.in_(ritual_ids)).values(status=ActionStatus.DONE, updated_at=now_utc())
-            )
-            log.info("Закрыто ритуальных экшенов: %d", len(ritual_ids))
-
-        await session.commit()
-
-        # Уведомляем участников ритуалов
-        if bot and ritual_participants:
-            user_cache = {}
-            for user_id, rituals in ritual_participants.items():
-                if user_id not in user_cache:
-                    user = await session.get(User, user_id)
-                    if user:
-                        user_cache[user_id] = user
-
-                if user_id in user_cache:
-                    user = user_cache[user_id]
-                    ritual_details = []
-                    for ritual in rituals:
-                        ritual_details.append(
-                            f"🕯️ {ritual['candles']} свечей - {ritual['location']}"
-                        )
-                    
-                    body = (
-                        "Ваши ритуальные действия завершены.\n\n"
-                        "Проведённые ритуалы:\n" + "\n".join(ritual_details) +
-                        "\n\nРезультаты ритуалов могут повлиять на дальнейшие события в игре."
-                    )
-                    await notify_user(bot, user.tg_id, title="🕯️ Ритуалы завершены", body=body)
+    )
+    
+    # Уведомляем участников ритуалов о завершении (только самих участников)
+    if bot:
+        for action in expired_rituals:
+            user = await session.get(User, action.owner_id)
+            if user:
+                candles_used = getattr(action, 'candles', 0) or 0
+                duration_hours = candles_used * 10 // 60  # примерно часы
+                duration_minutes = (candles_used * 10) % 60
+                
+                duration_text = ""
+                if duration_hours > 0:
+                    duration_text += f"{duration_hours}ч "
+                if duration_minutes > 0:
+                    duration_text += f"{duration_minutes}мин"
+                
+                body = (
+                    f"Ваш ритуал завершён.\n\n"
+                    f"🕯️ Использовано свечей: {candles_used}\n"
+                    f"⏱️ Продолжительность: {duration_text.strip()}\n"
+                    f"📍 Место: {action.text[:100] if action.text else 'Не указано'}\n\n"
+                    f"Результаты ритуала могут повлиять на дальнейшие события в игре."
+                )
+                await notify_user(bot, user.tg_id, title="🕯️ Ритуал завершён", body=body)
+    
+    await session.commit()
+    log.info(f"Закрыто {len(expired_rituals)} завершённых ритуалов")
 
 
 # ===========================
@@ -1095,8 +1092,8 @@ async def run_game_cycle():
             with StepTimer("Шаг 3: Закрыть все разведки"):
                 await close_all_scouting(session)
 
-            with StepTimer("Шаг 3.5: Закрыть все ритуалы"):
-                await close_all_rituals(session)
+            with StepTimer("Шаг 3.5: Обработка завершённых ритуалов"):
+                await process_expired_rituals(session)
 
             with StepTimer("Шаг 4: Пересчёт ресурсных множителей"):
                 await recalc_resource_multipliers(session)

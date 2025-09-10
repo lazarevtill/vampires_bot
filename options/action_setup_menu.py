@@ -10,7 +10,7 @@ from sqlalchemy.orm import selectinload
 
 from .registry import option
 from db.session import get_session
-from db.models import Action, ActionType, User, ActionStatus, District, user_scouts_districts
+from db.models import Action, ActionType, User, ActionStatus, District, user_scouts_districts, now_utc
 from screens.settings_action import SettingsActionScreen
 
 
@@ -74,21 +74,20 @@ async def _notify_ritual_action(session, bot, actor: User, action: Action):
     if not all_recipients:
         return
     
-    who = actor.in_game_name or actor.username or f"#{actor.tg_id}"
     candles_count = getattr(action, "candles", 0) or 0
     title = "🕯️ Ритуальная активность"
     
-    # Формируем сообщение в зависимости от наличия информации о свечах
+    # АНОНИМНОЕ уведомление - никто не должен знать, кто проводит ритуал
     if candles_count > 0:
         body = (
-            f"{who} начал(а) ритуальное действие.\n"
-            f"🕯️ Количество свечей: {candles_count}\n"
-            f"📍 Место: {action.text[:100] if action.text else 'Не указано'}..."
+            f"Обнаружена ритуальная активность.\n"
+            f"🕯️ Интенсивность: {candles_count} свечей\n"
+            f"📍 Место: {action.text[:100] if action.text else 'Местоположение скрыто'}..."
         )
     else:
         body = (
-            f"{who} начал(а) ритуальное действие.\n"
-            f"📍 Место: {action.text[:100] if action.text else 'Не указано'}..."
+            f"Обнаружена ритуальная активность.\n"
+            f"📍 Место: {action.text[:100] if action.text else 'Местоположение скрыто'}..."
         )
     
     # Отправляем уведомления
@@ -126,9 +125,8 @@ async def _notify_ritual_cancellation(session, bot, actor: User, action: Action,
     if not all_recipients:
         return
     
-    who = actor.in_game_name or actor.username or f"#{actor.tg_id}"
-    title = "🔔 Ритуал отменён"
-    body = f"{who} {reason} ритуальное действие."
+    title = "🔔 Ритуальная активность прекращена"
+    body = f"Ритуальная активность в регионе прекратилась."
     
     # Отправляем уведомления
     for user in all_recipients.values():
@@ -517,6 +515,11 @@ async def action_setup_menu_done(cb: types.CallbackQuery, state, action_id: int,
                 if cnt < 1 or cnt > _MAX_CANDLES:
                     await cb.answer("Укажи число свечей от 1 до 8.", show_alert=True)
                     return
+                
+                # Устанавливаем время завершения ритуала: 10 минут на свечу
+                from datetime import timedelta
+                ritual_duration = timedelta(minutes=10 * cnt)
+                action.ritual_end_time = now_utc() + ritual_duration
             else:
                 total_resources = (action.money or 0) + (action.influence or 0) + (action.information or 0) + (
                     action.force or 0)

@@ -507,6 +507,9 @@ class Action(Base):
     estimated_power: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     on_point: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     won_on_point: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    
+    # For rituals: when the ritual should automatically complete
+    ritual_end_time: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
